@@ -1,11 +1,63 @@
-useEffect(() => {
-  const interval = setInterval(() => {
-    setData((prev) => {
-      const newData = [...prev];
-      newData[0]['Pass'] = Math.floor(Math.random() * 10);
-      return newData;
-    });
-  }, 3000);
+const suites = [
+  {
+    id: 'suite1',
+    name: 'Suite 1',
+    tests: [
+      { id: 'test1', name: 'Test 1' },
+      { id: 'test2', name: 'Test 2' },
+    ],
+  },
+  {
+    id: 'suite2',
+    name: 'Suite 2',
+    tests: [
+      { id: 'test3', name: 'Test 3' },
+      { id: 'test4', name: 'Test 4' },
+    ],
+  },
+];
 
-  return () => clearInterval(interval);
-}, []);
+const [selectedSuiteId, setSelectedSuiteId] = useState<string>('suite1');
+const [selectedTestIds, setSelectedTestIds] = useState<string[]>([]);
+
+const currentSuite = suites.find(s => s.id === selectedSuiteId);
+
+return (
+  <>
+    {/* Suite Selector */}
+    <FlatList
+      data={suites}
+      horizontal
+      renderItem={({ item }) => (
+        <Button title={item.name} onPress={() => setSelectedSuiteId(item.id)} />
+      )}
+    />
+
+    {/* Test List */}
+    <FlatList
+      data={currentSuite?.tests || []}
+      renderItem={({ item }) => {
+        const isSelected = selectedTestIds.includes(item.id);
+
+        const toggleSelection = () => {
+          setSelectedTestIds(prev =>
+            isSelected
+              ? prev.filter(id => id !== item.id)
+              : [...prev, item.id]
+          );
+        };
+
+        return (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Text>{item.name}</Text>
+            <Switch value={isSelected} onValueChange={toggleSelection} />
+            <Button title="View" onPress={() => console.log('View', item.id)} />
+          </View>
+        );
+      }}
+    />
+  </>
+);
+
+
+
