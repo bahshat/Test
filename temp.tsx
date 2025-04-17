@@ -1,28 +1,24 @@
-// App.tsx
-import React, { Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { View, Text } from 'react-native';
-import Menu from './Menu'; // Your existing menu component
 
+const pageNames = ['Logs', 'ReportView', 'ExecuteTest']; // Only add page names here
 
-
-const LazyPage = ({ pageName }: { pageName: string }) => {
-  const PageComponent = React.lazy(() => import(`./pages/${pageName}`));
-  return <PageComponent />;
+const PageLoader = ({ pageName }: { pageName: string }) => {
+  const LazyComponent = React.lazy(() => import(`./pages/${pageName}`));
+  return (
+    <Suspense fallback={<Text>Loading...</Text>}>
+      <LazyComponent />
+    </Suspense>
+  );
 };
 
-
 export default function App() {
-  const [currentPage, setCurrentPage] = React.useState('Logs'); // default
+  const [currentPage, setCurrentPage] = useState('Logs');
 
   return (
-    <View style={{ flex: 1, flexDirection: 'row' }}>
-      <Menu onChange={setCurrentPage} selected={currentPage} />
-
-      <View style={{ flex: 1 }}>
-        <Suspense fallback={<Text>Loading...</Text>}>
-          <LazyPage pageName={currentPage} />
-        </Suspense>
-      </View>
+    <View style={{ flex: 1 }}>
+      {/* Your side menu can setCurrentPage with any value from pageNames */}
+      <PageLoader pageName={currentPage} />
     </View>
   );
 }
