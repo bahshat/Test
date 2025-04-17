@@ -1,20 +1,14 @@
-# launch.ps1
+import { spawn } from 'child_process';
+import { AppRegistry } from 'react-native';
+import App from './App';
+import { name as appName } from './app.json';
 
-# Step 1: Start backend
-Start-Process -FilePath "C:\path\to\your\backend.exe"
+// Launch backend only once
+const backendProcess = spawn('C:\\Path\\To\\Your\\Backend.exe', [], {
+  detached: true,
+  stdio: 'ignore', // or 'inherit' to see logs
+});
 
-# Step 2: Wait for backend to be ready
-$ready = $false
-while (-not $ready) {
-    try {
-        $response = Invoke-WebRequest -Uri "http://localhost:5000/health" -UseBasicParsing -TimeoutSec 2
-        if ($response.StatusCode -eq 200) {
-            $ready = $true
-        }
-    } catch {
-        Start-Sleep -Seconds 1
-    }
-}
+backendProcess.unref(); // Let it run independently
 
-# Step 3: Launch RNW frontend
-Start-Process -FilePath "C:\path\to\your\ReactNativeWindowsApp.exe"
+AppRegistry.registerComponent(appName, () => App);
