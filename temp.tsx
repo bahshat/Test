@@ -1,39 +1,32 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import { MenuProps } from '../utils/model';
-
-const logo = require('../../assets/logo.jpg');
-
-const menuTitles = ['Execute Test', 'Execution Status', 'Logs', 'Report View'];
-
-const pageToMenuMap: Record<string, string> = {
-  'View Test': 'Execute Test',
-  'Detail View': 'Report View',
-  'Graph View': 'Report View',
-};
-
-const getMenuForPage = (pageName: string) => pageToMenuMap[pageName] || pageName;
-
-export default function Menu({ currentPage, setPage }: MenuProps): React.JSX.Element {
-  const selectedTitle = getMenuForPage(currentPage);
-
-  return (
-    <View style={styles.container}>
-      <Image source={logo} style={styles.logo} />
-      {menuTitles.map((title, index) => {
-        const selected = title === selectedTitle;
-
-        return (
-          <TouchableOpacity
-            key={index}
-            onPress={() => setPage({ name: title, props: {} })}
-            style={[styles.menuItem, selected && styles.selected]}
-          >
-            <Text style={styles.text}>{title}</Text>
-            {selected && <View style={styles.indicator} />}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
+const styles = StyleSheet.create({
+  container: {
+    width: 220,
+    backgroundColor: '#fff',
+    paddingTop: 20,
+  },
+  logo: {
+    width: '100%',
+    height: 80,
+    resizeMode: 'contain',
+    marginBottom: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 40,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  selected: {
+    backgroundColor: '#ddd',
+  },
+  text: {
+    flex: 1,
+    fontSize: 15,
+  },
+  indicator: {
+    width: 5,
+    height: '100%',
+    backgroundColor: 'maroon',
+  },
+});
