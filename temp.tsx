@@ -1,26 +1,17 @@
-enum ExecutionState {
-  Idle,
-  Running,
-  Paused
-}
+<PrimaryButton
+  title="Start"
+  onClick={() => handleAction('Start')}
+  disabled={execState !== ExecutionState.Idle}
+/>
 
-const [execState, setExecState] = useState<ExecutionState>(ExecutionState.Idle);
+<PrimaryButton
+  title={execState === ExecutionState.Paused ? 'Resume' : 'Pause'}
+  onClick={() => handleAction(execState === ExecutionState.Paused ? 'Resume' : 'Pause')}
+  disabled={execState === ExecutionState.Idle}
+/>
 
-const handleAction = (action: 'Start' | 'Pause' | 'Resume' | 'Stop') => {
-  Network.changeExecution(action); // your API call
-
-  switch (action) {
-    case 'Start':
-      setExecState(ExecutionState.Running);
-      break;
-    case 'Pause':
-      setExecState(ExecutionState.Paused);
-      break;
-    case 'Resume':
-      setExecState(ExecutionState.Running);
-      break;
-    case 'Stop':
-      setExecState(ExecutionState.Idle);
-      break;
-  }
-};
+<PrimaryButton
+  title="Stop"
+  onClick={() => handleAction('Stop')}
+  disabled={execState === ExecutionState.Idle}
+/>
