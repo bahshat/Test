@@ -1,36 +1,67 @@
-import eventlet
-eventlet.monkey_patch()
+import React, { useEffect, useRef, useState } from 'react';
+import { ScrollView, Text, View, Switch, StyleSheet } from 'react-native';
+import { initWebSocket, subscribeTo, unsubscribe } from '../common/Network';
 
-from flask import Flask
-from flask_socketio import SocketIO
+const LOG_TYPES = ['info', 'debug', 'warn', 'error', 'verbose'];
 
-import time
-import random
+const LogScreen = () => {
+  const [logFilters, setLogFilters] = useState<Record<string, boolean>>(
+    Object.fromEntries(LOG_TYPES.map((type) => [type, true]))
+  );
+  const [logs, setLogs] = useState<string[]>([]);
+  const scrollRef = useRef<ScrollView>(null);
 
-app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+  useEffect(() => {
+    initWebSocket();
+    subscribeTo('log', (newLog) => {
+      setLogs((prev) => [...prev.slice(-999), newLog]);
+    });
+    return () => unsubscribe('log');
+  }, []);
 
-@app.route("/")
-def index():
-    return "WebSocket Server Running"
+  const filteredLogs = logs.filter((log) => {
+    const tag = log.split(']')[0].slice(1).toLowerCase();
+    return logFilters[tag];
+  });
 
-def emit_logs():
-    log_levels = ['INFO', 'DEBUG', 'WARN', 'ERROR']
-    while True:
-        level = random.choice(log_levels)
-        socketio.emit('log', f"[{level}] Sample log at {time.time()}")
-        time.sleep(1)
+  const toggleSwitch = (type: string) =>
+    setLogFilters((prev) => ({ ...prev, [type]: !prev[type] }));
 
-def emit_status():
-    for i in range(0, 101, 10):
-        socketio.emit('statusUpdate', {'id': 'test-123', 'progress': f"{i}%"})
-        time.sleep(2)
+  return (
+    <View style={styles.container}>
+      <View style={styles.filterRow}>
+        {LOG_TYPES.map((type) => (
+          <View key={type} style={styles.switchContainer}>
+            <Text style={styles.switchLabel}>{type}</Text>
+            <Switch
+              value={logFilters[type]}
+              onValueChange={() => toggleSwitch(type)}
+            />
+          </View>
+        ))}
+      </View>
+      <ScrollView ref={scrollRef} style={styles.logBox} onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}>
+        {filteredLogs.map((log, i) => (
+          <Text key={i} style={[styles.logText, getLogStyle(log)]}>{log}</Text>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
 
-@socketio.on('connect')
-def on_connect():
-    print("Client connected")
+const getLogStyle = (log: string) => {
+  if (log.includes('[ERROR]')) return { color: 'red' };
+  if (log.includes('[WARN]')) return { color: 'blue' };
+  return { color: 'white' };
+};
 
-if __name__ == '__main__':
-    socketio.start_background_task(emit_logs)
-    socketio.start_background_task(emit_status)
-    socketio.run(app, host='0.0.0.0', port=5000)
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'black', padding: 10 },
+  filterRow: { flexDirection: 'row', marginBottom: 10, justifyContent: 'space-around' },
+  switchContainer: { flexDirection: 'row', alignItems: 'center' },
+  switchLabel: { color: 'white', marginRight: 5 },
+  logBox: { flex: 1, backgroundColor: '#111', padding: 10 },
+  logText: { fontFamily: 'monospace', fontSize: 12, marginBottom: 2 },
+});
+
+export default LogScreen;
