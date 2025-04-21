@@ -1,32 +1,26 @@
-const styles = StyleSheet.create({
-  container: {
-    width: 220,
-    backgroundColor: '#fff',
-    paddingTop: 20,
-  },
-  logo: {
-    width: '100%',
-    height: 80,
-    resizeMode: 'contain',
-    marginBottom: 20,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 40,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-  },
-  selected: {
-    backgroundColor: '#ddd',
-  },
-  text: {
-    flex: 1,
-    fontSize: 15,
-  },
-  indicator: {
-    width: 5,
-    height: '100%',
-    backgroundColor: 'maroon',
-  },
-});
+let socket: WebSocket | null = null;
+const listeners: Record<string, (data: any) => void> = {};
+
+export const initWebSocket = () => {
+  if (socket) return;
+  socket = new WebSocket('ws://localhost:5000/ws');
+
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.type && listeners[data.type]) {
+      listeners[data.type](data.payload);
+    }
+  };
+
+  socket.onclose = () => {
+    socket = null;
+  };
+};
+
+export const subscribeTo = (type: string, callback: (data: any) => void) => {
+  listeners[type] = callback;
+};
+
+export const unsubscribe = (type: string) => {
+  delete listeners[type];
+};
