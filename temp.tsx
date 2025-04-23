@@ -1,31 +1,77 @@
-const WebSocket = require('ws');
-const express = require('express');
-const http = require('http');
+import React from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  FlatList,
+} from 'react-native';
 
-const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+type Header = {
+  title: string;
+  width: number;
+};
 
-wss.on('connection', function connection(ws) {
-  console.log('Client connected');
+type TableProps = {
+  headers: Header[];
+  rows: any[];
+  onRowTap?: (index: number) => void;
+};
 
-  // Send dummy logs periodically
-  setInterval(() => {
-    const levels = ['debug', 'info', 'warning', 'error'];
-    const level = levels[Math.floor(Math.random() * levels.length)];
-    const message = `${new Date().toISOString()} [${level.toUpperCase()}] Dummy log message`;
-    ws.send(JSON.stringify({ type: 'log', level, message }));
-  }, 1000);
+const Table = ({ headers, rows, onRowTap }: TableProps) => {
+  const renderCells = (item: any, isHeader = false) =>
+    headers.map(({ title, width }, index) => {
+      const text = isHeader ? title.toUpperCase() : item[title];
+      const style = [
+        { flex: width },
+        styles.cellText,
+        isHeader && styles.headerText,
+      ];
+      return (
+        <Text key={index} style={style}>
+          {text}
+        </Text>
+      );
+    });
 
-  // Send dummy execution status periodically
-  let progress = 0;
-  const interval = setInterval(() => {
-    if (progress >= 100) return;
-    progress += 10;
-    ws.send(JSON.stringify({ type: 'status', progress }));
-  }, 2000);
+  const renderRow = ({ item, index }: { item: any; index: number }) => (
+    <TouchableOpacity
+      key={index}
+      onPress={onRowTap ? () => onRowTap(index) : undefined}
+      activeOpacity={onRowTap ? 0.4 : 1}
+    >
+      <View style={styles.row}>{renderCells(item)}</View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.tableContainer}>
+      <View style={styles.header}>{renderCells({}, true)}</View>
+      <FlatList
+        data={rows}
+        renderItem={renderRow}
+        keyExtractor={(_, i) => i.toString()}
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  tableContainer: { width: '100%' },
+  header: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    backgroundColor: 'lightgray',
+    marginBottom: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    marginBottom: 4,
+  },
+  cellText: { paddingHorizontal: 5 },
+  headerText: { fontWeight: 'bold' },
 });
 
-server.listen(8081, () => {
-  console.log('WebSocket server running on ws://localhost:8081');
-});
+export default Table;
