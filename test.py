@@ -1,24 +1,27 @@
-Here's the minimal Flask WebSocket server that continuously sends messages once connected:
+Here's the concise version with a message generator function:
 
 ```python
-from flask import Flask
-from flask_sock import Sock
-import time
+import random
+from datetime import datetime
 
-app = Flask(__name__)
-sock = Sock(app)
+def generate_log_message():
+    log_types = [
+        ("DEBUG", "System check completed"),
+        ("INFO", "New connection established"),
+        ("WARNING", "High memory usage detected"),
+        ("ERROR", "Failed to process request"),
+        ("VERBOSE", "Background task running")
+    ]
+    category, message = random.choice(log_types)
+    return f"[{datetime.now().isoformat()}] {category}: {message}"
 
-@sock.route('/stream')
-def message_stream(ws):
-    while True:
-        ws.send("PLACEHOLDER MESSAGE")  # Will replace this later
-        time.sleep(1)  # Send every second
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+# Example usage:
+# ws.send(generate_log_message())
 ```
 
-This will:
-1. Accept WebSocket connections at `/stream`
-2. Continuously send "PLACEHOLDER MESSAGE" every second
-3. Keep the connection alive until client disconnects
+Add this to your WebSocket handler and replace the placeholder with `generate_log_message()`.
+
+Would you like me to:
+1. Add severity levels?
+2. Include JSON formatted messages?
+3. Add specific log patterns?
