@@ -1,86 +1,84 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Text, View, Switch, StyleSheet, FlatList } from 'react-native';
 import { initWebSocket, subscribeTo, unsubscribe } from '../utils/WebSocketNetwork';
-import { LOG_COLOUR, LOG_TYPES } from '../utils/Constants';
+import { LOG_TYPES, LOG_COLOUR } from '../utils/Constants';
 import { Logs } from '../utils/model';
-import axios from 'axios';
 
-export default function Log({ testId }: { testId: string }) {
-  const [logLevel, setLogLevel] = useState<Record<string, boolean>>(
+export default function Log({ logFileContent }: { logFileContent?: string }) {
+  const [logLevel, setLogLevel] = useState(() =>
     Object.fromEntries(LOG_TYPES.map(type => [type, true]))
   );
   const [logs, setLogs] = useState<Logs[]>([]);
-  const [wsConnected, setWsConnected] = useState(true);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<Logs>>(null);
 
-  // Fetch full logs from API
-  const fetchFullLog = async () => {
-    try {
-      const res = await axios.get(`/api/logs/${testId}`);
-      const lines = res.data.split('\n').map((line: string): Logs => {
-        const [timestamp, rest] = line.split('] > [');
-        const [category, message] = rest.split(']:: ');
-        return {
-          timestamp: timestamp.replace('[', '').trim(),
-          category: category.trim().toLowerCase(),
-          message: message.trim()
-        };
-      });
-      setLogs(lines);
-    } catch (err) {
-      console.error('Error fetching full log:', err);
-    }
-  };
-
-  // Handle WebSocket messages
-  const handleNewLog = useCallback((newLog: Logs) => {
-    setLogs(prev => [...prev, newLog]);
+  // Parse file content to logs
+  const parseLogFileContent = useCallback((content: string): Logs[] => {
+    const lines = content.split('\n').filter(Boolean);
+    return lines.map(line => {
+      const timestamp = line.slice(0, 19); // Assuming format: 'YYYY-MM-DD HH:MM:SS'
+      const match = line.match(/\[(.*?)\]/);
+      const category = match?.[1]?.toLowerCase() || 'info';
+      const message = line.split('::').slice(1).join('::').trim();
+      return { timestamp, category, message };
+    });
   }, []);
 
   useEffect(() => {
-    fetchFullLog();
-    initWebSocket(
-      () => setWsConnected(true),
-      () => setWsConnected(false)
-    );
-    subscribeTo('log', handleNewLog);
-    return () => unsubscribe('log');
-  }, [handleNewLog]);
+    if (logFileContent) {
+      setLogs(parseLogFileContent(logFileContent));
+      return;
+    }
 
-  const toggleSwitch = (type: string) =>
-    setLogLevel(prev => ({ ...prev, [type]: !prev[type] }));
+    initWebSocket();
+
+    const logCallback = (newLog: Logs) => {
+      setLogs(prev => [...prev.slice(-999), newLog]); // Keep max 1000 logs
+    };
+
+    subscribeTo('log', logCallback);
+    return () => unsubscribe('log');
+  }, [logFileContent]);
 
   const filteredLogs = logs.filter(log => logLevel[log.category]);
 
-  const renderLogLine = ({ item }: { item: Logs }) => (
-    <Text style={[styles.logText, { color: LOG_COLOUR[item.category] || 'white' }]}>
-      [{item.timestamp}] > [{item.category.toUpperCase()}]:: {item.message}
-    </Text>
+  const toggleSwitch = (type: string) => {
+    setLogLevel(prev => ({ ...prev, [type]: !prev[type] }));
+  };
+
+  const createSwitch = (type: string) => (
+    <View key={type} style={styles.switchContainer}>
+      <Text style={styles.switchLabel}>{type.toUpperCase()}</Text>
+      <Switch value={logLevel[type]} onValueChange={() => toggleSwitch(type)} />
+    </View>
+  );
+
+  const createLogSwitchBar = () => (
+    <View style={styles.filterRow}>
+      {LOG_TYPES.map(type => createSwitch(type))}
+    </View>
+  );
+
+  const createLogLine = ({ item, index }: { item: Logs; index: number }) => {
+    const logStyle = [styles.logText, { color: LOG_COLOUR[item.category] || 'white' }];
+    const logStr = `${item.timestamp} [${item.category.toUpperCase()}]:: ${item.message}`;
+    return <Text key={index} style={logStyle}>{logStr}</Text>;
+  };
+
+  const createLogBox = () => (
+    <FlatList
+      style={styles.logBox}
+      ref={flatListRef}
+      onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+      data={filteredLogs}
+      renderItem={createLogLine}
+      keyExtractor={(_, index) => String(index)}
+    />
   );
 
   return (
     <View style={styles.container}>
-      <View style={styles.filterRow}>
-        {LOG_TYPES.map(type => (
-          <View key={type} style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>{type.toUpperCase()}</Text>
-            <Switch value={logLevel[type]} onValueChange={() => toggleSwitch(type)} />
-          </View>
-        ))}
-      </View>
-
-      {!wsConnected && (
-        <Text style={{ color: 'red', marginBottom: 5 }}>WebSocket disconnected</Text>
-      )}
-
-      <FlatList
-        ref={flatListRef}
-        data={filteredLogs}
-        renderItem={renderLogLine}
-        keyExtractor={(_, index) => index.toString()}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        style={styles.logBox}
-      />
+      {createLogSwitchBar()}
+      {createLogBox()}
     </View>
   );
 }
@@ -92,10 +90,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     justifyContent: 'space-between',
     backgroundColor: 'gray',
-    flexWrap: 'wrap'
+    padding: 6,
   },
-  switchContainer: { flexDirection: 'row', alignItems: 'center', margin: 6 },
+  switchContainer: { flexDirection: 'row', alignItems: 'center' },
   switchLabel: { color: 'white', marginRight: 10 },
-  logBox: { flex: 1, backgroundColor: '#111', padding: 10, marginLeft: 10 },
-  logText: { fontFamily: 'monospace', fontSize: 14, marginBottom: 2 }
+  logBox: { flex: 1, backgroundColor: '#111', padding: 10 },
+  logText: { fontFamily: 'monospace', fontSize: 14, marginBottom: 2 },
 });
