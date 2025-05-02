@@ -1,11 +1,11 @@
-export const LOG_TYPES = ['info', 'debug', 'warning', 'error', 'verbose'] as const;
+import RNFS from 'react-native-fs';
 
-export const LOG_COLOUR: Record<string, string> = {
-  error: 'red',
-  warning: 'orange',
-  debug: 'cyan',
-  verbose: 'gray',
-  info: 'white',
+const readLogFile = async (path: string) => {
+  try {
+    const content = await RNFS.readFile(path, 'utf8');
+    return content;
+  } catch (err) {
+    console.error('File read error:', err.message);
+    return '';
+  }
 };
-
-export const WEBSOCKET_BASE_URL = 'ws://localhost:3000/ws'; // Update as needed
