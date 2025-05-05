@@ -1,71 +1,49 @@
-if (type === 'header' && actions.length > 0) {
-  // Append an empty cell for buttons
-  headersWithAction = [...headers, { title: '', width: 1 }];
-} else {
-  headersWithAction = [...headers];
-}
+// Graph.tsx
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
 
-
-const renderCells = (type: 'header' | 'row', item?: any) => {
-  const dynamicHeaders = actions.length > 0 && type === 'header'
-    ? [...headers, { title: '', width: 1 }]
-    : headers;
-
-  return dynamicHeaders.map(({ title, width }, index) => {
-    const text = type === 'header' ? title.toUpperCase() : item?.[title];
-    const fontWeight = type === 'header' ? 'bold' : 'normal';
-    return (
-      <Text key={index} style={{ flex: width, paddingHorizontal: 5, fontWeight }}>
-        {text}
-      </Text>
-    );
-  });
+type Point = { x: number; y: number };
+type Props = {
+  data: Point[]; // e.g., [{x:0, y:10}, {x:1, y:30}, {x:2, y:15}]
+  width?: number;
+  height?: number;
 };
 
+export default function Graph({ data, width = 300, height = 200 }: Props) {
+  const maxY = Math.max(...data.map(p => p.y));
+  const maxX = Math.max(...data.map(p => p.x));
 
-
-{actions.length > 0 && (
-  <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-start' }}>
-    {actions.map((action, i) => (
-      <SecondaryButton
-        key={i}
-        title={action}
-        onClick={() => handleAction?.(index, action)}
-      />
-    ))}
-  </View>
-)}
-
-const actionFlex = actions.length * 0.6; // or any suitable value per button
-const headersWithAction = actions.length > 0
-  ? [...headers, { title: '', width: actionFlex }]
-  : headers;
-
-
-return headersWithAction.map(({ title, width }, index) => {
-  const text = type === 'header' ? title.toUpperCase() : title ? item[title] : '';
   return (
-    <Text key={index} style={{ flex: width, paddingHorizontal: 5, fontWeight: type === 'header' ? 'bold' : 'normal' }}>
-      {text}
-    </Text>
+    <View style={[styles.graph, { width, height }]}>
+      {data.map((point, i) => {
+        const left = (point.x / maxX) * width;
+        const bottom = (point.y / maxY) * height;
+        return (
+          <View
+            key={i}
+            style={[
+              styles.point,
+              { left: left - 4, bottom: bottom - 4 },
+            ]}
+          />
+        );
+      })}
+    </View>
   );
+}
+
+const styles = StyleSheet.create({
+  graph: {
+    position: 'relative',
+    backgroundColor: '#eee',
+    borderWidth: 1,
+    borderColor: '#aaa',
+  },
+  point: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'blue',
+  },
 });
-
-
-{actions.length > 0 && (
-  <View style={{ flex: actionFlex, flexDirection: 'row', gap: 4 }}>
-    {actions.map((action, i) => (
-      <SecondaryButton
-        key={i}
-        title={action}
-        onClick={() => handleAction?.(index, action)}
-      />
-    ))}
-  </View>
-)}
-
-
-
-
-
-
