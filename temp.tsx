@@ -1,94 +1,106 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Pressable,
-} from 'react-native';
+To handle your Flask + React Native Windows (RNW) app responses cleanly and in a scalable manner, here are full recommendations and code snippets.
 
-type FileSelectorModalProps = {
-  visible: boolean;
-  files: string[];
-  onSelect: (fileName: string) => void;
-  onClose: () => void;
-  title?: string;
-};
+1. Standard Flask Response Format
 
-export default function FileSelectorModal({
-  visible,
-  files,
-  onSelect,
-  onClose,
-  title = 'Select a File',
-}: FileSelectorModalProps) {
-  if (!visible) return null;
+Update all your Flask endpoints to return a consistent format. Example:
 
-  return (
-    <View style={styles.overlay}>
-      <View style={styles.modal}>
-        <Text style={styles.title}>{title}</Text>
-        <ScrollView style={styles.scroll}>
-          {files.map((file, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.item}
-              onPress={() => {
-                onSelect(file);
-                onClose();
-              }}
-            >
-              <Text style={styles.fileText}>{file}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <Pressable onPress={onClose} style={styles.closeButton}>
-          <Text style={styles.closeText}>Cancel</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+def create_response(data=None, msg="Success", code=200):
+    return jsonify({
+        "status": {
+            "code": code,
+            "msg": msg
+        },
+        "data": data
+    }), code
+
+Usage in /suites:
+
+@app.route('/suites')
+def get_suites():
+    return create_response(data=suites, msg="Suites fetched successfully")
+
+2. Centralized Response Handler in RNW (Network.ts)
+
+Refactor your fetch logic into a shared utility:
+
+static async request(endpoint: string, method: string = 'GET', body: any = null) {
+    try {
+        const response = await fetch(endpoint, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : null,
+        });
+
+        const data = await response.json();
+        const statusCode = response.status;
+
+        if (!response.ok) {
+            console.warn('Network error:', data);
+        }
+
+        return { statusCode, data };
+    } catch (error) {
+        console.error('Fetch exception:', error);
+        return { statusCode: 500, data: { status: { msg: 'Internal error' } } };
+    }
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: '#00000099',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  modal: {
-    width: '80%',
-    maxHeight: '70%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-  },
-  scroll: {
-    marginVertical: 10,
-  },
-  item: {
-    paddingVertical: 10,
-    borderBottomColor: '#ccc',
-    borderBottomWidth: 1,
-  },
-  fileText: {
-    fontSize: 16,
-  },
-  title: {
-    fontWeight: 'bold',
-    fontSize: 18,
-    textAlign: 'center',
-  },
-  closeButton: {
-    marginTop: 10,
-    alignSelf: 'center',
-    padding: 8,
-  },
-  closeText: {
-    color: 'blue',
-  },
-});
+Then update methods like:
+
+static async getSuites(callback) {
+    const { data } = await this.request(`${BASE_URL}suites`);
+    callback(data);
+}
+
+static async sendTestIdsForExecution(ids, configFileName, callback) {
+    const body = { test_ids: ids, configFileName };
+    const { data } = await this.request(`${BASE_URL}execute`, 'POST', body);
+    callback(data);
+}
+
+3. Auto-Generate API Documentation for Flask
+
+Use Flasgger or APISpec:
+
+With Flasgger (easy setup):
+
+pip install flasgger
+
+Add to your app:
+
+from flasgger import Swagger
+
+app = Flask(__name__)
+swagger = Swagger(app)
+
+Now annotate routes:
+
+@app.route('/suites')
+def get_suites():
+    """
+    Get all suites
+    ---
+    responses:
+      200:
+        description: A list of test suites
+        schema:
+          id: Suites
+          properties:
+            status:
+              type: object
+              properties:
+                code:
+                  type: integer
+                msg:
+                  type: string
+            data:
+              type: array
+              items:
+                type: string
+    """
+    return create_response(data=suites)
+
+Now run the app and access Swagger UI at:
+http://localhost:<port>/apidocs
+
+Would you like a ready template repo for this setup with Swagger + consistent response pattern?
