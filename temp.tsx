@@ -1,12 +1,12 @@
-import { z } from 'zod';
-
-const logLineRegex = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[[A-Z]+\]:: .+$/;
-
 export const HistoricLogSchema = z.string().refine(val => {
-  return val
-    .trim()
-    .split('\n')
-    .every(line => logLineRegex.test(line));
+  const lines = val.trim().split('\n');
+  for (const line of lines) {
+    if (!logLineRegex.test(line.trim())) {
+      console.log('Invalid Line:', JSON.stringify(line));
+      return false;
+    }
+  }
+  return true;
 }, {
-  message: 'One or more lines in log do not match expected format (timestamp [TYPE]:: message)',
+  message: 'One or more lines in log do not match expected format (timestamp [TYPE] :: message)',
 });
