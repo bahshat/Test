@@ -1,10 +1,21 @@
-function toCamelCase(str: string): string {
-  return str
-    .replace(/([-_][a-z])/gi, (match) =>
-      match.toUpperCase().replace('-', '').replace('_', '')
-    );
-}
+// utils/schemas.ts
+import { z } from 'zod';
 
-// Example usage:
-console.log(toCamelCase("hello_world")); // Output: "helloWorld"
-console.log(toCamelCase("convert-this-string")); // Output: "convertThisString"
+export const SuiteSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  tests: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+    })
+  )
+});
+
+export const ReportSchema = z.array(
+  z.object({
+    executionId: z.string(),
+    passed: z.number(),
+    failed: z.number(),
+  })
+);
