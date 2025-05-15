@@ -1,21 +1,12 @@
-// utils/schemas.ts
 import { z } from 'zod';
 
-export const SuiteSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  tests: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-    })
-  )
-});
+const logLineRegex = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[[A-Z]+\]:: .+$/;
 
-export const ReportSchema = z.array(
-  z.object({
-    executionId: z.string(),
-    passed: z.number(),
-    failed: z.number(),
-  })
-);
+export const HistoricLogSchema = z.string().refine(val => {
+  return val
+    .trim()
+    .split('\n')
+    .every(line => logLineRegex.test(line));
+}, {
+  message: 'One or more lines in log do not match expected format (timestamp [TYPE]:: message)',
+});
