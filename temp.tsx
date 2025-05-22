@@ -1,1 +1,1 @@
-signtool sign /fd SHA256 /a /f "C:\OchoaTestCert.cer" "path\to\your\App.msix"
+signtool sign /fd SHA256 /a /f "%USERPROFILE%\Desktop\OchoaTestCert.cer" "C:\path\to\your\app.msix"
