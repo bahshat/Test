@@ -1,2 +1,1 @@
-$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=OchoaTestCert" -CertStoreLocation "Cert:\LocalMachine\My"
-Export-Certificate -Cert $cert -FilePath "$env:USERPROFILE\Desktop\OchoaTestCert.cer"
+Import-Certificate -FilePath "$env:USERPROFILE\Desktop\OchoaTestCert.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople"
