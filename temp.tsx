@@ -1,1 +1,1 @@
-Import-Certificate -FilePath "$env:USERPROFILE\Desktop\OchoaTestCert.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople"
+Test-Path "$env:USERPROFILE\Desktop\OchoaTestCert.cer"
