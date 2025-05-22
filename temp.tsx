@@ -1,18 +1,8 @@
-const logLineRegex = /^\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} \[[A-Z]+\] :: .+$/;
+$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=OchoaTestCert" -CertStoreLocation "Cert:\LocalMachine\My"
+Export-Certificate -Cert $cert -FilePath "C:\OchoaTestCert.cer"
 
-export const HistoricLogSchema = z.string().refine(val => {
-  const logLines = val
-    .trim()
-    .split(/(?=\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2})/)
-    .map(line => line.trim());
+Import-Certificate -FilePath "C:\OchoaTestCert.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople"
 
-  for (const line of logLines) {
-    if (!logLineRegex.test(line)) {
-      console.log('Invalid log line:', JSON.stringify(line));
-      return false;
-    }
-  }
-  return true;
-}, {
-  message: 'One or more log entries do not match expected format (timestamp [TYPE] :: message)',
-});
+signtool sign /fd SHA256 /a /f "C:\OchoaTestCert.cer" "path\to\your\App.msix"
+
+Add-AppxPackage "path\to\your\App.msix"
