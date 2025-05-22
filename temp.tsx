@@ -1,1 +1,1 @@
-Test-Path "$env:USERPROFILE\Desktop\OchoaTestCert.cer"
+signtool sign /fd SHA256 /a /f "C:\OchoaTestCert.cer" "path\to\your\App.msix"
