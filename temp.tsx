@@ -1,37 +1,73 @@
-Thanks for confirming. Since you’ve followed all proper steps (correct certificate, signing tool, no timestamp, rebuilt .msix) and SignerSign() is still failing, here’s what we will do now:
+Yes — we can absolutely debug this. When your installed RNW app isn’t hitting the Flask API, it’s usually due to network restrictions, localhost confusion, or packaging permissions.
 
-✅ Alternative Solution: Distribute Without Signing
+Let’s fix it step-by-step.
 
-Since your use case is internal/testing:
+✅ Step-by-Step Debugging
 
-1. Use App Installer PowerShell Script Only
+1. Confirm: Is Flask Running and Listening?
 
-Skip .msix signing — just install the app using:
+Run your Flask app manually and confirm:
 
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-Add-AppxPackage -ForceApplicationShutdown "C:\path\to\your\App.msix"
+ * Running on http://127.0.0.1:5000
 
-This works if:
-	•	The device has sideloading enabled
-(Settings > For Developers > Install apps from any source)
-	•	The .msix doesn’t require store-level signing
+If it says 127.0.0.1 and your app is trying to hit localhost, that’s fine — but if the frontend is using localhost and you later package the app, it may resolve differently.
 
-✅ Fallback Plan: Use Portable Executable
+2. Use Full IP Instead of localhost or 127.0.0.1
 
-You can also package the RNW app as a portable .exe that:
-	•	Doesn’t use .msix
-	•	Just launches your React Native Windows app via script
+Edit your Flask app.run() to listen on all interfaces:
 
-Let me know if you’d prefer this — I can help create:
-	•	A bundled .zip with:
-	•	Backend .exe
-	•	RNW app starter .bat
-	•	Config check
+app.run(host='0.0.0.0', port=5000)
 
-No signing or installation needed — just extract and run.
+And in your React Native Windows Constants.ts, update:
 
-✅ Recommendation
+export const BASE_URL = 'http://127.0.0.1:5000'; // or use your local IP like http://192.168.1.x:5000
 
-For dev/demo sharing, this “portable zip + launcher” method is safest and avoids all signtool issues.
+Make sure it’s not localhost if app is installed via MSIX — due to UWP containerization, localhost might behave differently.
 
-Would you like me to help you prepare that now?
+3. Temporarily Log Inside RNW App
+
+In the network call (inside Network.ts):
+
+console.log("Calling API at: ", BASE_URL);
+try {
+  const res = await fetch(BASE_URL + "/suites");
+  console.log("Response received");
+} catch (err) {
+  console.error("API call failed:", err);
+}
+
+Then open the app and press:
+
+Ctrl + Shift + I
+
+You’ll get React DevTools + Console. Check the logs.
+
+4. Enable Loopback (Required for MSIX apps)
+
+Critical for localhost access in packaged apps
+
+Run this in PowerShell (Admin):
+
+CheckNetIsolation LoopbackExempt -a -n="Ochoa_123abcxyz" 
+
+	Replace "Ochoa_123abcxyz" with your actual package family name. You can find it using:
+
+Get-AppxPackage | Where-Object { $_.Name -like "*Ochoa*" } | Select PackageFamilyName
+
+5. Test API from PowerShell
+
+Check if Windows can hit the Flask API at all:
+
+curl http://127.0.0.1:5000/suites
+
+If this fails, Flask isn’t running or listening on correct IP.
+
+✅ Summary
+
+Step	Goal
+Host = 0.0.0.0	Ensure Flask accepts external connections
+BASE_URL = IP	Avoid localhost quirks in MSIX
+Dev console in RNW	See live errors
+Loopback exempt	Allow MSIX to hit local server
+
+Would you like me to create a NetworkChecker.ts module to test connectivity and show alerts if Flask is unreachable?
