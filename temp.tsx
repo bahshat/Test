@@ -1,41 +1,49 @@
-Thanks for the update! If you’re not seeing the “Packaging” tab, it’s likely because your RNW project isn’t yet set up as a packaged desktop app. We’ll fix that by adding an App Packaging project to your solution manually.
+Understood — for non-technical users, we need a one-click install experience that:
+	•	Installs the certificate
+	•	Installs the .msixbundle
+	•	Runs silently or with simple prompts
+	•	Requires no PowerShell typing
 
-✅ Fix: Enable Packaging Support for RNW App in Visual Studio
+✅ Solution: A Custom .bat or .ps1 Script
 
-✅ Step-by-Step
+You’ll share a single script file (install-ochoa.bat) alongside your .msixbundle and .cer.
 
-1. Open Visual Studio & Solution
+When the user right-clicks → Run as Administrator, it will:
+	1.	Install the cert to TrustedPeople
+	2.	Install the .msixbundle
+	3.	Show a success message
 
-Open Ochoa.sln from yourproject/windows/.
+✅ Option A: Create install-ochoa.bat
 
-2. Add App Packaging Project
-	1.	Right-click the solution > Add > New Project
-	2.	In the dialog:
-	•	Search: Packaging
-	•	Choose: Windows Application Packaging Project
-	3.	Name it: Ochoa.Package
-	4.	Target the same Windows 10 SDK version you’re using in the RNW app (e.g., 10.0.19041.0)
+@echo off
+echo Installing certificate...
+powershell -command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -Command \"Import-Certificate -FilePath .\Ochoa.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople\"' -Verb RunAs"
 
-3. Add Project Reference
-	1.	Right-click on the new Ochoa.Package project > Add > Reference
-	2.	In “Projects” tab, check your main app project (e.g., Ochoa)
-	3.	Click OK
+echo Installing Ochoa app...
+powershell -command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -Command \"Add-AppxPackage -Path .\Ochoa.msixbundle\"' -Verb RunAs"
 
-This links your RNW app to the packaging project.
+echo Done. Press any key to close.
+pause
 
-4. Set Startup Project
-	•	Right-click Ochoa.Package > Set as Startup Project
+✅ Option B: PowerShell Script (if .bat blocked)
 
-5. Now Publish
-	•	Right-click Ochoa.Package > Publish > Create App Packages
-	•	Follow the same steps:
-	•	Choose Sideloading
-	•	Do not upload to Store
-	•	Choose version
-	•	Click Create
+Name: install-ochoa.ps1
 
-✅ Done!
+Start-Process powershell -Verb RunAs -ArgumentList @"
+  -ExecutionPolicy Bypass -Command `
+  "Import-Certificate -FilePath '.\Ochoa.cer' -CertStoreLocation Cert:\LocalMachine\TrustedPeople; `
+   Add-AppxPackage -Path '.\Ochoa.msixbundle'"
+"@
 
-This will generate a working .msix + Add-AppDevPackage.ps1 + .cer file.
+✅ Usage for End User
+	1.	Extract folder containing:
 
-Let me know once it’s done — and I’ll help you customize the app icon, display name, or embed your backend in the same package (optional).
+Ochoa.msixbundle
+Ochoa.cer
+install-ochoa.bat
+
+
+	2.	Right-click install-ochoa.bat → Run as Administrator
+	3.	Done — app will install with no command typing
+
+Would you like me to generate this folder structure as a zip template for you?
