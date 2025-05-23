@@ -1,73 +1,41 @@
-Yes — we can absolutely debug this. When your installed RNW app isn’t hitting the Flask API, it’s usually due to network restrictions, localhost confusion, or packaging permissions.
+Thanks for the update! If you’re not seeing the “Packaging” tab, it’s likely because your RNW project isn’t yet set up as a packaged desktop app. We’ll fix that by adding an App Packaging project to your solution manually.
 
-Let’s fix it step-by-step.
+✅ Fix: Enable Packaging Support for RNW App in Visual Studio
 
-✅ Step-by-Step Debugging
+✅ Step-by-Step
 
-1. Confirm: Is Flask Running and Listening?
+1. Open Visual Studio & Solution
 
-Run your Flask app manually and confirm:
+Open Ochoa.sln from yourproject/windows/.
 
- * Running on http://127.0.0.1:5000
+2. Add App Packaging Project
+	1.	Right-click the solution > Add > New Project
+	2.	In the dialog:
+	•	Search: Packaging
+	•	Choose: Windows Application Packaging Project
+	3.	Name it: Ochoa.Package
+	4.	Target the same Windows 10 SDK version you’re using in the RNW app (e.g., 10.0.19041.0)
 
-If it says 127.0.0.1 and your app is trying to hit localhost, that’s fine — but if the frontend is using localhost and you later package the app, it may resolve differently.
+3. Add Project Reference
+	1.	Right-click on the new Ochoa.Package project > Add > Reference
+	2.	In “Projects” tab, check your main app project (e.g., Ochoa)
+	3.	Click OK
 
-2. Use Full IP Instead of localhost or 127.0.0.1
+This links your RNW app to the packaging project.
 
-Edit your Flask app.run() to listen on all interfaces:
+4. Set Startup Project
+	•	Right-click Ochoa.Package > Set as Startup Project
 
-app.run(host='0.0.0.0', port=5000)
+5. Now Publish
+	•	Right-click Ochoa.Package > Publish > Create App Packages
+	•	Follow the same steps:
+	•	Choose Sideloading
+	•	Do not upload to Store
+	•	Choose version
+	•	Click Create
 
-And in your React Native Windows Constants.ts, update:
+✅ Done!
 
-export const BASE_URL = 'http://127.0.0.1:5000'; // or use your local IP like http://192.168.1.x:5000
+This will generate a working .msix + Add-AppDevPackage.ps1 + .cer file.
 
-Make sure it’s not localhost if app is installed via MSIX — due to UWP containerization, localhost might behave differently.
-
-3. Temporarily Log Inside RNW App
-
-In the network call (inside Network.ts):
-
-console.log("Calling API at: ", BASE_URL);
-try {
-  const res = await fetch(BASE_URL + "/suites");
-  console.log("Response received");
-} catch (err) {
-  console.error("API call failed:", err);
-}
-
-Then open the app and press:
-
-Ctrl + Shift + I
-
-You’ll get React DevTools + Console. Check the logs.
-
-4. Enable Loopback (Required for MSIX apps)
-
-Critical for localhost access in packaged apps
-
-Run this in PowerShell (Admin):
-
-CheckNetIsolation LoopbackExempt -a -n="Ochoa_123abcxyz" 
-
-	Replace "Ochoa_123abcxyz" with your actual package family name. You can find it using:
-
-Get-AppxPackage | Where-Object { $_.Name -like "*Ochoa*" } | Select PackageFamilyName
-
-5. Test API from PowerShell
-
-Check if Windows can hit the Flask API at all:
-
-curl http://127.0.0.1:5000/suites
-
-If this fails, Flask isn’t running or listening on correct IP.
-
-✅ Summary
-
-Step	Goal
-Host = 0.0.0.0	Ensure Flask accepts external connections
-BASE_URL = IP	Avoid localhost quirks in MSIX
-Dev console in RNW	See live errors
-Loopback exempt	Allow MSIX to hit local server
-
-Would you like me to create a NetworkChecker.ts module to test connectivity and show alerts if Flask is unreachable?
+Let me know once it’s done — and I’ll help you customize the app icon, display name, or embed your backend in the same package (optional).
