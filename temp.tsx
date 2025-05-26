@@ -1,49 +1,45 @@
-Understood — for non-technical users, we need a one-click install experience that:
-	•	Installs the certificate
-	•	Installs the .msixbundle
-	•	Runs silently or with simple prompts
-	•	Requires no PowerShell typing
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import Status from '../src/pages/Status';
 
-✅ Solution: A Custom .bat or .ps1 Script
+describe('Status Buttons', () => {
+  const mockAlert = jest.spyOn(Alert, 'alert');
 
-You’ll share a single script file (install-ochoa.bat) alongside your .msixbundle and .cer.
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-When the user right-clicks → Run as Administrator, it will:
-	1.	Install the cert to TrustedPeople
-	2.	Install the .msixbundle
-	3.	Show a success message
+  const simulateAlertChain = (action: string) => {
+    // Simulate the confirmation popup and user pressing OK
+    const confirmCallback = mockAlert.mock.calls[0][2]?.find(b => b.text === 'OK')?.onPress;
+    confirmCallback?.();
 
-✅ Option A: Create install-ochoa.bat
+    // Then success message should show up
+    expect(mockAlert).toHaveBeenCalledWith('Success', `${action} action performed successfully`);
+  };
 
-@echo off
-echo Installing certificate...
-powershell -command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -Command \"Import-Certificate -FilePath .\Ochoa.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople\"' -Verb RunAs"
+  it('handles Resume button correctly', async () => {
+    const { getByText } = render(<Status />);
+    fireEvent.press(getByText('Resume'));
 
-echo Installing Ochoa app...
-powershell -command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -Command \"Add-AppxPackage -Path .\Ochoa.msixbundle\"' -Verb RunAs"
+    expect(mockAlert).toHaveBeenCalledWith('Confirm', expect.stringContaining('Resume'), expect.any(Array));
+    simulateAlertChain('Resume');
+  });
 
-echo Done. Press any key to close.
-pause
+  it('handles Pause button correctly', async () => {
+    const { getByText } = render(<Status />);
+    fireEvent.press(getByText('Pause'));
 
-✅ Option B: PowerShell Script (if .bat blocked)
+    expect(mockAlert).toHaveBeenCalledWith('Confirm', expect.stringContaining('Pause'), expect.any(Array));
+    simulateAlertChain('Pause');
+  });
 
-Name: install-ochoa.ps1
+  it('handles Stop button correctly', async () => {
+    const { getByText } = render(<Status />);
+    fireEvent.press(getByText('Stop'));
 
-Start-Process powershell -Verb RunAs -ArgumentList @"
-  -ExecutionPolicy Bypass -Command `
-  "Import-Certificate -FilePath '.\Ochoa.cer' -CertStoreLocation Cert:\LocalMachine\TrustedPeople; `
-   Add-AppxPackage -Path '.\Ochoa.msixbundle'"
-"@
-
-✅ Usage for End User
-	1.	Extract folder containing:
-
-Ochoa.msixbundle
-Ochoa.cer
-install-ochoa.bat
-
-
-	2.	Right-click install-ochoa.bat → Run as Administrator
-	3.	Done — app will install with no command typing
-
-Would you like me to generate this folder structure as a zip template for you?
+    expect(mockAlert).toHaveBeenCalledWith('Confirm', expect.stringContaining('Stop'), expect.any(Array));
+    simulateAlertChain('Stop');
+  });
+});
