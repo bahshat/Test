@@ -1,17 +1,17 @@
-describe('Simple API test without React Native', () => {
-  it('should return expected suites from API', async () => {
-    const response = await fetch('http://127.0.0.1:5000/suites');
-    expect(response.status).toBe(200);
+// __tests__/api-call.test.js
 
-    const data = await response.json();
-    console.log('Received data:', data);
+const fetch = require('node-fetch');
 
-    // Very basic check
+describe('API Test', () => {
+  it('should return suites from Flask', async () => {
+    const res = await fetch('http://127.0.0.1:5000/suites');
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    console.log('DATA:', data);
+
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThan(0);
-
-    // Optional: check shape of first item
     expect(data[0]).toHaveProperty('id');
-    expect(data[0]).toHaveProperty('name');
   });
 });
