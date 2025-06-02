@@ -1,86 +1,91 @@
-import React from 'react';
-import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
-import { WebView } from 'react-native-webview';
+Here’s how you can implement all your mentioned features clearly and safely:
 
-function App() {
-  const handleLoadStart = () => {
-    console.log('WebView: Loading started...');
+✅ Goals Recap:
+	1.	Replace WebSocket with polling.
+	2.	Start/stop polling based on:
+	•	Navigation away
+	•	STOP/PAUSE actions
+	•	RESUME should resume polling
+	3.	Add progress % for currently executing row.
+	4.	Stop polling and interval once all rows are PASSED or FAILED.
+
+✅ Changes Needed (Short, Point-Wise):
+
+1. Polling Setup
+
+Inside useEffect, replace WebSocket with polling:
+
+useEffect(() => {
+  let interval: NodeJS.Timeout;
+
+  const fetchStatus = () => {
+    Network.getStatus(dataCallback);
   };
 
-  const handleLoadEnd = (syntheticEvent) => {
-    const { nativeEvent } = syntheticEvent;
-    if (nativeEvent.loading) {
-        console.log('WebView: Loading finished (but still rendering)');
-    } else {
-        console.log('WebView: Loading completely finished');
-    }
-  };
+  // Start polling
+  fetchStatus(); // initial
+  interval = setInterval(fetchStatus, 3000); // every 3 sec
 
-  const handleLoadError = (syntheticEvent) => {
-    const { nativeEvent } = syntheticEvent;
-    console.error('WebView Load Error:', nativeEvent);
-    // You can display an error message to the user here
-  };
+  return () => clearInterval(interval); // clear on unmount
+}, []);
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.headerText}>Opening Google.com in WebView</Text>
-      <WebView
-        source={{ uri: 'https://www.google.com/' }}
-        style={styles.webview}
-        javaScriptEnabled={true} // Usually good to have for most websites
-        domStorageEnabled={true} // For websites that use local storage
-        startInLoadingState={true} // Show loading indicator initially
-        renderLoading={() => ( // Custom loading component
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#0000ff" />
-            <Text>Loading Google...</Text>
-          </View>
-        )}
-        onLoadStart={handleLoadStart}
-        onLoadEnd={handleLoadEnd}
-        onError={handleLoadError}
-        // Important for debugging (check F12 Dev Tools for WebView)
-        // Set to true to enable webview debugging.
-        // For older RNW/WebView versions, this might be needed.
-        // allowFileAccess={true}
-        // allowUniversalAccessFromFileURLs={true}
-      />
-    </View>
-  );
-}
+2. Control Polling Dynamically
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  webview: {
-    flex: 1, // Make sure the WebView takes up available space
-    width: '100%', // Take full width
-    minHeight: 300, // Ensure it has a minimum height if not flexed
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-});
+Declare globally:
 
-export default App;
+let pollingInterval: NodeJS.Timeout | null = null;
+
+Add helper:
+
+const startPolling = () => {
+  if (pollingInterval) return;
+  Network.getStatus(dataCallback);
+  pollingInterval = setInterval(() => {
+    Network.getStatus(dataCallback);
+  }, 3000);
+};
+
+const stopPolling = () => {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+};
+
+Use these inside button logic:
+
+if (action === Execution.RESUME) startPolling();
+else if (action === Execution.PAUSE || action === Execution.STOP) stopPolling();
+
+Also call stopPolling() in useEffect cleanup.
+
+3. Show Progress Percentage
+
+In your dataCallback, after setting setData(), call:
+
+updatePercentage();
+
+Logic for that:
+
+const updatePercentage = () => {
+  const executingRow = data.find(row => row.status === 'Executing');
+  if (!executingRow) return;
+
+  const started = new Date(executingRow.started_on).getTime();
+  const now = Date.now();
+  const elapsed = (now - started) / 1000; // seconds
+  const total = executingRow.total_time_required;
+
+  const percent = Math.min(100, Math.floor((elapsed / total) * 100));
+  executingRow.status = `${percent}%`;
+  setData(prev => prev.map(row => row.test_id === executingRow.test_id ? executingRow : row));
+};
+
+4. Auto-stop When All Done
+
+At the end of dataCallback:
+
+const allCompleted = data.every(row => ['Passed', 'Failed'].includes(row.status));
+if (allCompleted) stopPolling();
+
+Let me know if you want me to update your code with these changes together.
