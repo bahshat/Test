@@ -1,25 +1,93 @@
-@echo off
-title Launching Ochoa App
+Awesome — you’re very close to turning your app into a complete Windows installer. Let’s walk through this cleanly using WiX Toolset (or optionally, simpler tools like Inno Setup or NSIS).
 
-:: Step 1: Launch backend
-echo Starting Backend...
-start "" /b /min "C:\Path\To\Backend.exe"
+✅ What is WiX Toolset?
 
-:: Step 2: Wait until backend is accepting requests
-echo Waiting for backend to be ready...
-:waitloop
-powershell -Command ^
-  "$res = try {Invoke-WebRequest -Uri 'http://127.0.0.1:5000/ping' -TimeoutSec 1 } catch { $null }; if (-not $res) { Start-Sleep -Milliseconds 500; exit 1 }"
-if errorlevel 1 goto waitloop
+	WiX (Windows Installer XML) is a powerful, Microsoft-supported framework for building Windows Installer (.msi) packages via XML.
 
-echo Backend is ready.
+You can use it to:
+	•	Unzip files
+	•	Install MSIX or EXEs
+	•	Set execution policy
+	•	Create Start Menu shortcuts
+	•	Move files to Program Files
+	•	Set app icons
+	•	Even add registry keys, services, uninstallers, etc.
 
-:: Step 3: Launch frontend (.exe or MSIX)
-echo Launching Frontend...
-start "" /wait "C:\Path\To\Ochoa.exe"
+✅ Your Setup Summary
 
-:: Step 4: Kill backend after frontend closes
-echo Closing backend...
-powershell -Command "Get-Process | Where-Object { $_.Path -like '*Backend.exe' } | Stop-Process -Force"
+You Have:
+	•	A .zip containing:
+	•	frontend.msixbundle + Add-AppDevPackage.ps1
+	•	backend.zip (with Backend.exe)
+	•	launcher.bat
+	•	Ochoa.ico (optional)
 
-exit
+✅ What the Installer Needs to Do:
+
+✅ 1. Extract backend
+	•	Unzip backend.zip
+	•	Move contents to:
+
+C:\Program Files\OchoaBackend\
+
+✅ 2. Install Frontend
+	•	Set execution policy (current user)
+	•	Run: Add-AppDevPackage.ps1 from the MSIX bundle folder
+
+✅ 3. Set Up Launcher
+	•	Move launcher.bat to:
+
+C:\Program Files\OchoaLauncher\launcher.bat
+
+
+	•	Create a shortcut:
+	•	Named: Ochoa App
+	•	Target: the .bat
+	•	Icon: Ochoa.ico
+	•	Location: Start Menu:
+
+C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Ochoa.lnk
+
+✅ How to Build This in WiX?
+
+Tools needed:
+	•	WiX Toolset
+	•	Visual Studio WiX Extension (optional but helpful)
+
+✅ Alternative: Use Inno Setup (Simpler)
+
+If WiX feels too XML-heavy, you can use Inno Setup, which uses a Pascal-style script, easier to learn and faster to prototype.
+
+✅ Suggestion: Start Simple — Manual Scripted Installer First
+
+Create a PowerShell install.ps1 that does:
+
+# 1. Unzip backend
+Expand-Archive -Path ".\backend.zip" -DestinationPath "C:\Program Files\OchoaBackend" -Force
+
+# 2. Install frontend
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
+.\Add-AppDevPackage.ps1
+
+# 3. Copy launcher
+New-Item -ItemType Directory -Path "C:\Program Files\OchoaLauncher" -Force
+Copy-Item ".\launcher.bat" "C:\Program Files\OchoaLauncher\launcher.bat" -Force
+
+# 4. Create shortcut in Start Menu
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut("C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Ochoa.lnk")
+$Shortcut.TargetPath = "C:\Program Files\OchoaLauncher\launcher.bat"
+$Shortcut.IconLocation = "C:\Path\To\Ochoa.ico"
+$Shortcut.Save()
+
+Then just wrap this with Inno Setup or WiX when ready.
+
+✅ Final Suggestion
+	•	Start with PowerShell-based installer for testing
+	•	Once solid, move to WiX or Inno Setup for full polish
+
+Would you like:
+	•	A ready .iss Inno Setup script?
+	•	Or a WiX XML + installer sample?
+
+Let me know your preference and I’ll generate it.
