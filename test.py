@@ -1,86 +1,86 @@
-Great — here’s how to launch and manage your Python backend .exe from C# within your React Native Windows (RNW) app.
+Perfect — since you’re seeing App.cpp instead of App.xaml.cs, your React Native Windows app uses a C++/WinRT entry point (not C#).
 
-✅ GOAL
-	•	Launch Backend.exe from your RNW C# project when the frontend starts.
-	•	Automatically kill it when the frontend exits.
-	•	Delay JS execution until backend is ready (optional: use a flag or event).
+Here’s how to launch your backend .exe using C++ in App.cpp, and kill it properly when your RNW app exits.
 
-✅ STEP-BY-STEP: C# Integration in RNW
+✅ Step-by-Step for C++/WinRT App (App.cpp)
 
-1. Open Your RNW C# App Project
+✅ 1. Include Required Headers
 
-In Visual Studio, go to:
+At the top of App.cpp, add:
 
-windows/Ochoa/Ochoa.cppproj
+#include <winrt/Windows.ApplicationModel.h>
+#include <winrt/Windows.ApplicationModel.Core.h>
+#include <winrt/Windows.ApplicationModel.Activation.h>
+#include <winrt/Windows.UI.Xaml.h>
+#include <ppltasks.h>
+#include <windows.h>
 
-Open App.xaml.cs
-(if it’s App.cs — fine).
+✅ 2. Declare Process Handle Globally
 
-2. Add Backend Process Logic
+Just below your App class definition (in the .cpp file), add:
 
-Add these fields at class-level:
+PROCESS_INFORMATION g_backendProcessInfo = {};
 
-using System.Diagnostics;
+✅ 3. Add Function to Launch Backend
 
-private static Process _backendProcess;
+Inside App.cpp, define this function:
 
-Then add the method to launch backend:
-
-private void LaunchBackend()
+void LaunchBackend()
 {
-    try
+    STARTUPINFOW si = { sizeof(STARTUPINFOW) };
+    std::wstring exePath = L"C:\\Path\\To\\Backend.exe"; // Change this
+
+    if (CreateProcessW(
+            exePath.c_str(),
+            NULL,
+            NULL,
+            NULL,
+            FALSE,
+            CREATE_NO_WINDOW,
+            NULL,
+            NULL,
+            &si,
+            &g_backendProcessInfo
+        ))
     {
-        string backendPath = @"C:\Path\To\Your\Backend.exe"; // Replace this
-
-        _backendProcess = new Process();
-        _backendProcess.StartInfo.FileName = backendPath;
-        _backendProcess.StartInfo.WorkingDirectory = System.IO.Path.GetDirectoryName(backendPath);
-        _backendProcess.StartInfo.UseShellExecute = false;
-        _backendProcess.StartInfo.CreateNoWindow = true;
-        _backendProcess.Start();
-
-        Debug.WriteLine("Backend launched.");
+        OutputDebugStringW(L"Backend.exe launched successfully.\n");
     }
-    catch (Exception ex)
+    else
     {
-        Debug.WriteLine("Failed to launch backend: " + ex.Message);
+        OutputDebugStringW(L"Failed to launch Backend.exe.\n");
     }
 }
 
-3. Call It When App Launches
+✅ 4. Launch Backend When App Starts
 
-Still inside App.xaml.cs, in the OnLaunched() method, add this before base.OnLaunched():
+In App::OnLaunched(...), near the top before Window::Current().Activate();, add:
 
 LaunchBackend();
 
-4. Kill Backend on App Exit
+✅ 5. Kill Backend When App Exits
 
-In the same file, override OnSuspending:
+Override OnSuspending:
 
-protected override void OnSuspending(object sender, Windows.ApplicationModel.SuspendingEventArgs e)
+void App::OnSuspending(IInspectable const&, Windows::ApplicationModel::SuspendingEventArgs const&)
 {
-    base.OnSuspending(sender, e);
-
-    if (_backendProcess != null && !_backendProcess.HasExited)
+    if (g_backendProcessInfo.hProcess != NULL)
     {
-        try { _backendProcess.Kill(); }
-        catch { }
+        TerminateProcess(g_backendProcessInfo.hProcess, 0);
+        CloseHandle(g_backendProcessInfo.hProcess);
+        CloseHandle(g_backendProcessInfo.hThread);
     }
 }
 
-	Optionally override OnUnhandledException to ensure you kill it on crash too.
+And register the handler once in App::App() constructor:
 
-5. Build & Test
-	•	Build the RNW app
-	•	Install it
-	•	Launch and confirm:
-	•	Backend.exe starts
-	•	It stops when app closes
+Windows::ApplicationModel::Core::CoreApplication::Suspending({ this, &App::OnSuspending });
 
-✅ Optional: Notify JS When Backend is Ready
+✅ Optional: Wait Until Backend Is Ready (Advanced)
 
-If your backend logs “READY” to a file or port:
-	•	You can create a NativeModule in C# that waits and then tells JS.
-	•	Or: let JS start calling APIs and handle connection failure visually (as fallback).
+You can:
+	•	Wait for a TCP port to open
+	•	Or wait for a file/signal from backend before rendering your JS root view
 
-Let me know if you want to implement the native-to-JS notification too (e.g., eventEmitter.send("backendReady")) — it’s advanced but nice polish.
+But it’s often enough to let JS try calling APIs and handle errors gracefully if backend isn’t ready yet.
+
+Let me know if you want that “wait for backend to be ready” part via polling or file-read.
