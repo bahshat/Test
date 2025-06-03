@@ -1,13 +1,6 @@
-import subprocess
-import time
+@echo off
+echo Starting Backend...
+cd /d "C:\Path\To\BackendFolder"
 
-# Launch backend.exe (detached)
-p = subprocess.Popen(["Backend.exe"], creationflags=subprocess.CREATE_NEW_CONSOLE)
-
-print("Backend started. Waiting...")
-try:
-    while True:
-        time.sleep(1)
-except KeyboardInterrupt:
-    print("Stopping backend...")
-    p.terminate()
+:: Run Backend.exe and keep console open
+start "BackendWindow" cmd /k "Backend.exe"
