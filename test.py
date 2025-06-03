@@ -1,93 +1,88 @@
-Awesome — you’re very close to turning your app into a complete Windows installer. Let’s walk through this cleanly using WiX Toolset (or optionally, simpler tools like Inno Setup or NSIS).
+Excellent refinements! Here’s how to address each of your points clearly and effectively:
 
-✅ What is WiX Toolset?
+✅ 1. Remove MSIX’s Default Start Menu Icon
 
-	WiX (Windows Installer XML) is a powerful, Microsoft-supported framework for building Windows Installer (.msi) packages via XML.
+When installing an MSIX via Add-AppDevPackage.ps1, Windows automatically adds a Start Menu entry. Since we don’t want users launching the frontend directly:
 
-You can use it to:
-	•	Unzip files
-	•	Install MSIX or EXEs
-	•	Set execution policy
-	•	Create Start Menu shortcuts
-	•	Move files to Program Files
-	•	Set app icons
-	•	Even add registry keys, services, uninstallers, etc.
+❌ There’s no official way to suppress MSIX icon creation
 
-✅ Your Setup Summary
+But ✅ here’s what you can do:
 
-You Have:
-	•	A .zip containing:
-	•	frontend.msixbundle + Add-AppDevPackage.ps1
-	•	backend.zip (with Backend.exe)
-	•	launcher.bat
-	•	Ochoa.ico (optional)
+✅ Workaround
+	•	After installing the MSIX, delete the unwanted shortcut from the Start Menu:
 
-✅ What the Installer Needs to Do:
-
-✅ 1. Extract backend
-	•	Unzip backend.zip
-	•	Move contents to:
-
-C:\Program Files\OchoaBackend\
-
-✅ 2. Install Frontend
-	•	Set execution policy (current user)
-	•	Run: Add-AppDevPackage.ps1 from the MSIX bundle folder
-
-✅ 3. Set Up Launcher
-	•	Move launcher.bat to:
-
-C:\Program Files\OchoaLauncher\launcher.bat
+Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\OchoaApp.lnk" -ErrorAction SilentlyContinue
 
 
-	•	Create a shortcut:
-	•	Named: Ochoa App
-	•	Target: the .bat
-	•	Icon: Ochoa.ico
-	•	Location: Start Menu:
 
-C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Ochoa.lnk
+	You can place this in your install.ps1 right after Add-AppDevPackage.ps1 runs.
 
-✅ How to Build This in WiX?
+✅ 2. Fix: Shortcut Icon Not Reflecting
 
-Tools needed:
-	•	WiX Toolset
-	•	Visual Studio WiX Extension (optional but helpful)
+This usually happens because .ico file:
+	•	Is missing or inaccessible at shortcut creation time
+	•	Is removed/moved afterward
+	•	Is not absolute path or not registered
 
-✅ Alternative: Use Inno Setup (Simpler)
+✅ Fix: Use full absolute path
 
-If WiX feels too XML-heavy, you can use Inno Setup, which uses a Pascal-style script, easier to learn and faster to prototype.
+Make sure Ochoa.ico exists before shortcut is created, and use this in your script:
 
-✅ Suggestion: Start Simple — Manual Scripted Installer First
+$iconPath = "C:\Program Files\OchoaLauncher\Ochoa.ico"
 
-Create a PowerShell install.ps1 that does:
+$Shortcut.IconLocation = "$iconPath,0"
 
-# 1. Unzip backend
-Expand-Archive -Path ".\backend.zip" -DestinationPath "C:\Program Files\OchoaBackend" -Force
+✅ Make sure to copy .ico file before shortcut creation:
 
-# 2. Install frontend
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned -Force
-.\Add-AppDevPackage.ps1
+Copy-Item ".\Ochoa.ico" "C:\Program Files\OchoaLauncher\Ochoa.ico"
 
-# 3. Copy launcher
-New-Item -ItemType Directory -Path "C:\Program Files\OchoaLauncher" -Force
-Copy-Item ".\launcher.bat" "C:\Program Files\OchoaLauncher\launcher.bat" -Force
+✅ 3. Make Launcher .bat Find Frontend App by Name
 
-# 4. Create shortcut in Start Menu
-$WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut("C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Ochoa.lnk")
-$Shortcut.TargetPath = "C:\Program Files\OchoaLauncher\launcher.bat"
-$Shortcut.IconLocation = "C:\Path\To\Ochoa.ico"
-$Shortcut.Save()
+You cannot run "Ochoa.exe" directly if it’s an MSIX app, but you can search and launch it via AppxPackage name dynamically using PowerShell.
 
-Then just wrap this with Inno Setup or WiX when ready.
+Here’s how to do it:
 
-✅ Final Suggestion
-	•	Start with PowerShell-based installer for testing
-	•	Once solid, move to WiX or Inno Setup for full polish
+✅ Replace your current frontend launch line in .bat:
 
-Would you like:
-	•	A ready .iss Inno Setup script?
-	•	Or a WiX XML + installer sample?
+for /f "tokens=*" %%i in ('powershell -command "Get-StartApps | Where-Object { $_.Name -like '*Ochoa*' } | Select -ExpandProperty AppId"') do (
+    explorer.exe shell:appsFolder\%%i
+)
 
-Let me know your preference and I’ll generate it.
+	This dynamically finds the App ID and launches it via shell:appsFolder\.
+
+✅ This way:
+	•	No hardcoded App ID
+	•	Even if AppID changes across machines, it still works
+
+✅ Bonus: Full Working .bat Snippet (Summarized)
+
+@echo off
+echo Launching Ochoa backend...
+
+start "" /b /min "C:\Program Files\OchoaBackend\Backend.exe"
+
+echo Waiting for backend...
+:waitloop
+powershell -Command ^
+  "$r = try {Invoke-WebRequest -Uri 'http://127.0.0.1:5000/ping' -TimeoutSec 1 } catch { $null }; if (-not $r) { Start-Sleep -Milliseconds 500; exit 1 }"
+if errorlevel 1 goto waitloop
+
+echo Backend ready. Launching frontend...
+
+:: Dynamically launch MSIX frontend
+for /f "tokens=*" %%i in ('powershell -command "Get-StartApps | Where-Object { $_.Name -like '*Ochoa*' } | Select -ExpandProperty AppId"') do (
+    start "" "explorer.exe" "shell:appsFolder\%%i"
+)
+
+:: Wait until app window closes
+:waitwindow
+powershell -Command ^
+  "$running = Get-Process | Where-Object { $_.MainWindowTitle -like '*Ochoa*' }; if ($running) { Start-Sleep -Seconds 5; exit 1 }"
+if errorlevel 1 goto waitwindow
+
+echo Closing backend...
+powershell -Command "Get-Process | Where-Object { $_.Path -like '*Backend.exe' } | Stop-Process -Force"
+
+exit
+
+Let me know if you want me to package all this logic into a prebuilt installer project (Inno Setup / WiX).
