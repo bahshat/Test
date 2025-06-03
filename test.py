@@ -83,4 +83,69 @@ You can:
 
 But it’s often enough to let JS try calling APIs and handle errors gracefully if backend isn’t ready yet.
 
-Let me know if you want that “wait for backend to be ready” part via polling or file-read.
+
+
+That red underline (E1696: cannot open source file) means your C++ project is missing required Windows SDK references.
+
+Specifically, it’s complaining it can’t find headers like:
+
+winrt/Windows.ApplicationModel.h
+
+These come from the C++/WinRT SDK and Windows SDK.
+
+✅ Fix It Step-by-Step
+
+✅ Step 1: Make Sure the Windows SDK is Installed
+
+Open Visual Studio Installer:
+	1.	Find your current Visual Studio installation.
+	2.	Click “Modify”
+	3.	Under “Individual Components”, make sure the following are checked:
+	•	✅ Windows 10 SDK (10.0.x or later)
+	•	✅ C++/WinRT
+	•	✅ C++ (v142 or v143) build tools
+
+Click Modify to install if anything’s missing.
+
+✅ Step 2: Update Project Includes
+
+In Visual Studio:
+	1.	Right-click your RNW C++ project (Ochoa or similar)
+	2.	Choose Properties
+	3.	Go to:
+
+Configuration Properties → C/C++ → General → Additional Include Directories
+
+
+	4.	Add:
+
+$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)\Generated Files
+
+✅ Step 3: Use Correct Header Includes
+
+Make sure your includes are correct (case-sensitive, and winrt/, not win/):
+
+#include <winrt/Windows.ApplicationModel.Core.h>
+#include <winrt/Windows.ApplicationModel.Activation.h>
+#include <winrt/Windows.UI.Xaml.h>
+#include <windows.h>
+
+	Do not use: #include <win/windows.ApplicationModel.h> ← this is incorrect.
+
+✅ Step 4: Clean and Rebuild
+
+Ctrl + Shift + B
+
+Or use Build > Rebuild Solution.
+
+✅ Summary
+
+Issue	Fix
+Cannot find winrt/...	Install C++/WinRT + Windows SDK
+Red underline in includes	Fix include paths in project
+Compilation still fails	Clean + rebuild solution
+
+Let me know your Visual Studio version and Windows SDK version if you’re still facing issues.
+
+
+kend to be ready” part via polling or file-read.
