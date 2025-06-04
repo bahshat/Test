@@ -1,3 +1,5 @@
+Start-Transcript -Path "$env:TEMP\OchoaInstallLog.txt"
+
 # Ensure script is running as administrator
 If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
     [Security.Principal.WindowsBuiltInRole] "Administrator"))
@@ -7,42 +9,58 @@ If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     exit
 }
 
-Write-Host "Uninstalling Ochoa..." -ForegroundColor Cyan
+Write-Host "`n🚀 Installing Ochoa..." -ForegroundColor Cyan
 
-# 1. Remove installed backend + launcher files
-$backendPath = "C:\Program Files\Ochoa"
-if (Test-Path $backendPath) {
-    Remove-Item -Path $backendPath -Recurse -Force
-    Write-Host "✅ Removed $backendPath"
+# 1. Unzip setup.zip to Program Files
+$destination = "C:\Program Files\Ochoa"
+$setupZip = ".\setup.zip"  # Must be in same folder as install.ps1 or provide full path
+
+if (Test-Path $setupZip) {
+    Expand-Archive -Path $setupZip -DestinationPath $destination -Force
+    Write-Host "✅ Unzipped to $destination"
 } else {
-    Write-Host "⚠️ Backend folder not found: $backendPath"
+    Write-Host "❌ setup.zip not found at $setupZip"
+    exit 1
 }
 
-# 2. Remove shortcut from Start Menu
+# 2. Create Start Menu shortcut to launcher.bat
 $shortcutPath = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Ochoa.lnk"
-if (Test-Path $shortcutPath) {
-    Remove-Item $shortcutPath -Force
-    Write-Host "✅ Removed Start Menu shortcut"
-} else {
-    Write-Host "⚠️ Shortcut not found"
+$launcherBat = "$destination\launcher.bat"
+$iconPath = "$destination\Ochoa.ico"  # Optional
+
+if (-not (Test-Path $launcherBat)) {
+    Write-Host "❌ launcher.bat not found at $launcherBat"
+    exit 1
 }
 
-# 3. Uninstall MSIX Frontend
-$packageName = "Ochoa"  # Match your app's name from Get-AppxPackage
-$appx = Get-AppxPackage | Where-Object { $_.Name -like "*$packageName*" }
+$WshShell = New-Object -ComObject WScript.Shell
+$Shortcut = $WshShell.CreateShortcut($shortcutPath)
+$Shortcut.TargetPath = "schtasks.exe"
+$Shortcut.Arguments = "/run /tn `"OchoaElevatedLauncher`""
+$Shortcut.IconLocation = "$iconPath"
+$Shortcut.Save()
+Write-Host "✅ Created shortcut at $shortcutPath"
 
-if ($appx) {
-    Remove-AppxPackage -Package $appx.PackageFullName
-    Write-Host "✅ Uninstalled MSIX frontend"
-} else {
-    Write-Host "⚠️ MSIX app not found"
-}
-
-# 4. Remove scheduled task for admin launcher (if used)
+# 3. Create Scheduled Task to run launcher.bat as admin
 $taskName = "OchoaElevatedLauncher"
-if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-    Write-Host "✅ Removed Scheduled Task"
+$action = New-ScheduledTaskAction -Execute $launcherBat
+$principal = New-ScheduledTaskPrincipal -UserId "BUILTIN\Administrators" -RunLevel Highest -LogonType Interactive
+$trigger = New-ScheduledTaskTrigger -AtLogOn -Once
+Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Trigger $trigger -Force
+Write-Host "✅ Scheduled task created for admin launcher"
+
+# 4. Install Frontend via Add-AppDevPackage.ps1
+$addAppScript = "$destination\frontend\Add-AppDevPackage.ps1"  # Adjust path if needed
+
+if (Test-Path $addAppScript) {
+    Write-Host "📦 Installing MSIX frontend..."
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+    powershell -ExecutionPolicy Bypass -File $addAppScript
+    Write-Host "✅ Frontend installed"
+} else {
+    Write-Host "⚠️ Add-AppDevPackage.ps1 not found"
 }
 
-Write-Host "`n🎉 Uninstallation complete." -ForegroundColor Green
+Write-Host "`n🎉 Ochoa installation completed successfully!" -ForegroundColor Green
+
+Stop-Transcript
