@@ -1,72 +1,56 @@
-Great! Here’s the revised code with PollingManager using your existing Network module’s getStatus method instead of using fetch directly.
+Here’s the fully updated functional version of PollingManager using your Network.getStatus method with a callback-based mechanism, no class:
 
 ✅ PollingManager.ts
 
-import Network from '../utils/Network';
+type DataCallback = (data: any) => void;
 
-type Callback = (data: any) => void;
+let pollingTimer: NodeJS.Timeout | null = null;
+let isPolling = false;
+let internalCallback: DataCallback | null = null;
+const delay = 5000;
 
-class PollingManager {
-  private intervalId: NodeJS.Timeout | null = null;
-  private delay = 5000;
-  private onData: Callback;
-  private shouldPoll = false;
+function pollOnce() {
+  if (!internalCallback) return;
 
-  constructor(onData: Callback) {
-    this.onData = onData;
-  }
+  const callbackWrapper = (data: any) => {
+    internalCallback?.(data);
 
-  private async poll() {
-    try {
-      const data = await Network.getStatus(); // Uses Network module
-      this.onData(data);
-
-      // Stop polling if no data
-      if (!data || !data.test_cases || data.test_cases.length === 0) {
-        this.stop();
-        return;
-      }
-
-      // Otherwise schedule next fetch
-      if (this.shouldPoll) {
-        this.intervalId = setTimeout(() => this.poll(), this.delay);
-      }
-    } catch (err) {
-      console.error('Polling error:', err);
-      this.stop(); // Stop polling on failure
+    if (!data || !data.test_cases || data.test_cases.length === 0) {
+      stopPolling();
+    } else {
+      pollingTimer = setTimeout(pollOnce, delay);
     }
-  }
+  };
 
-  public start() {
-    if (this.shouldPoll) return;
-    this.shouldPoll = true;
-    this.poll();
-  }
-
-  public stop() {
-    this.shouldPoll = false;
-    if (this.intervalId) {
-      clearTimeout(this.intervalId);
-      this.intervalId = null;
-    }
-  }
-
-  public isRunning() {
-    return this.shouldPoll;
-  }
+  // Your Network module call
+  import('../utils/Network').then(Network => {
+    Network.default.getStatus(callbackWrapper);
+  });
 }
 
-export default PollingManager;
+export function startPolling(callback: DataCallback) {
+  if (isPolling) return;
+  isPolling = true;
+  internalCallback = callback;
+  pollOnce();
+}
 
-You can now instantiate this in your page/component like:
+export function stopPolling() {
+  if (pollingTimer) clearTimeout(pollingTimer);
+  pollingTimer = null;
+  isPolling = false;
+  internalCallback = null;
+}
 
-const polling = useRef<PollingManager | null>(null);
+export function isPollingActive() {
+  return isPolling;
+}
+
+You can now use it like this in your page:
 
 useEffect(() => {
-  polling.current = new PollingManager(handlePollingData);
-  polling.current.start();
-
-  return () => polling.current?.stop();
+  startPolling(handlePollingData);
+  return () => stopPolling();
 }, []);
 
-Let me know when you’re ready to integrate controller logic next.
+Let me know if you want to expose logging or last fetch time too.
