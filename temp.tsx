@@ -1,52 +1,57 @@
-Here’s how we can implement the progress logic:
+Yes, you can definitely optimize this logic:
 
-✅ Assumptions
-	•	Each test row has:
-	•	total_time_required (in minutes)
-	•	started_on (timestamp string)
-	•	status (e.g. “executing”, “passed”, “failed”)
-	•	Only 1 test row at a time will be in executing state.
-	•	You want to:
-	•	Show percentage based on elapsed time.
-	•	But keep showing percentage until the status becomes pass/fail — not 100%.
+✅ Final Plan (Your Preference)
+	•	Avoid mapping the whole array.
+	•	Find and update only the executing row.
+	•	Keep logic outside updateExecution() for clarity.
 
-✅ What to Add in ExecutionStatus.tsx
+✅ Optimized Code
 
-Add a helper function:
+🧠 calculateProgress.ts (utility)
 
-function getProgressPercentage(startedOn: string, totalTime: number): string {
-  const startTime = new Date(startedOn).getTime();
+export function getProgressPercentage(startedOn: string, totalMinutes: number): string {
+  const start = new Date(startedOn).getTime();
   const now = Date.now();
-  const durationMs = totalTime * 60 * 1000;
-  const elapsedMs = now - startTime;
-
-  const percentage = Math.min((elapsedMs / durationMs) * 100, 99);
-  return `${Math.floor(percentage)}%`;
+  const durationMs = totalMinutes * 60 * 1000;
+  const elapsed = now - start;
+  const percent = Math.min((elapsed / durationMs) * 100, 99);
+  return `${Math.floor(percent)}%`;
 }
 
-✅ Modify the Table Rows Before Passing to UI
+✨ In ExecutionStatus.tsx
 
-Inside updateExecution() in ExecutionStatus.tsx:
+At the top:
+
+import { getProgressPercentage } from '../utils/calculateProgress';
+
+Then inside updateExecution:
 
 const updateExecution = (data: any) => {
   executionId.current = data.execution_id;
 
-  const updatedRows = data.test_cases.map((row: any) => {
-    if (
-      row.status.toLowerCase() === 'executing' &&
-      row.total_time_required &&
-      row.started_on
-    ) {
-      return {
-        ...row,
-        status: getProgressPercentage(row.started_on, row.total_time_required),
+  const executingIndex = data.test_cases.findIndex(
+    (t: any) => t.status?.toLowerCase() === 'executing'
+  );
+
+  let testCases = data.test_cases;
+  if (executingIndex !== -1) {
+    const executing = testCases[executingIndex];
+    if (executing.started_on && executing.total_time_required) {
+      testCases = [...testCases]; // clone to avoid mutating original
+      testCases[executingIndex] = {
+        ...executing,
+        status: getProgressPercentage(executing.started_on, executing.total_time_required),
       };
     }
-    return row;
-  });
+  }
 
-  setData(updatedRows);
+  setData(testCases);
   setExecutionState(StateMap[data.status]);
 };
 
-Let me know if you want this percentage to be shown as a bar (graphical) or just text.
+✅ Benefits:
+	•	Only modifies the executing row.
+	•	Keeps progress logic separate.
+	•	Keeps updateExecution clean and efficient.
+
+Let me know if you want to show a small visual bar instead of %.
