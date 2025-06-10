@@ -1,54 +1,37 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+trigger:
+  branches:
+    include:
+      - main
 
-type Props = {
-  currentPage: string | null;
-  menuClicked: (menuTitle: string) => void;
-};
+pool:
+  vmImage: 'windows-latest'
 
-export default function Menu({ currentPage, menuClicked }: Props): React.JSX.Element {
-  const menuTitles = ['Execute Test', 'Execution Status', 'Logs', 'Report View'];
+variables:
+  buildConfiguration: 'Release'
+  solution: '**/Ochoa.sln'
+  project: '**/Ochoa.Package/Ochoa.Package.wapproj'
+  outputPath: '$(Build.ArtifactStagingDirectory)/AppPackages'
 
-  return (
-    <View style={styles.menuContainer}>
-      <Image style={styles.logo} source={require('../../assets/logo.jpg')} />
-      {menuTitles.map((title, index) => (
-        <TouchableOpacity
-          key={index}
-          style={[
-            styles.menuItem,
-            title === currentPage && styles.selectedMenuItem,
-          ]}
-          onPress={() => menuClicked(title)}
-        >
-          <Text style={styles.menuText}>{title}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
+steps:
+  - task: NodeTool@0
+    inputs:
+      versionSpec: '18.x'
+    displayName: 'Install Node.js'
 
-const styles = StyleSheet.create({
-  menuContainer: {
-    width: 180,
-    backgroundColor: '#f0f0f0',
-    paddingTop: 20,
-  },
-  logo: {
-    width: '100%',
-    height: 80,
-    resizeMode: 'contain',
-    marginBottom: 20,
-  },
-  menuItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
-  selectedMenuItem: {
-    backgroundColor: '#ddd',
-  },
-  menuText: {
-    fontSize: 16,
-  },
-});
+  - script: |
+      yarn install
+    displayName: 'Install dependencies'
+
+  - task: VSBuild@1
+    inputs:
+      solution: '$(solution)'
+      configuration: '$(buildConfiguration)'
+      msbuildArgs: '/p:Platform=x64 /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Always /p:AppxBundlePlatforms="x64" /p:GenerateAppInstallerFile=False /p:AppxPackageDir="$(outputPath)\\"'
+      vsVersion: '17.0'
+    displayName: 'Build UWP App Package'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(outputPath)'
+      ArtifactName: 'app-drop'
+      publishLocation: 'Container'
