@@ -1,56 +1,44 @@
-👍 Got it! Here’s how you can copy the frontend folder to C:\Program Files\Ochoa, use it during install, and clean it up after installation finishes.
+Yes, you can call your Ochoa.Package_10.msixbundle (or .msibundle) directly from Inno Setup or PowerShell — but with one big condition:
 
-✅ Step-by-Step Plan
+	🛑 .msixbundle requires elevation and uses App Installer (or PowerShell) to install.
 
-✅ 1. Copy frontend folder to {app} (Program Files\Ochoa)
+✅ Option 1: Use PowerShell to Install .msixbundle
 
-[Files]
-Source: "installer_setup\frontend\*"; DestDir: "{app}\frontend"; Flags: recursesubdirs
-
-✅ 2. Run the PowerShell install script from {app}\frontend
+This is the recommended and standard way:
 
 [Run]
 Filename: "powershell.exe";
-Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\frontend\Add-AppDevPackage.ps1""";
+Parameters: "-ExecutionPolicy Bypass -NoProfile -Command Add-AppxPackage -Path '{app}\frontend\Ochoa.Package_10.msixbundle'";
 Flags: runhidden waituntilterminated
 
-✅ 3. Delete frontend folder after install
+	✅ This works even without modifying Add-AppDevPackage.ps1 and avoids needing that script.
 
-There are two ways to do this:
+✅ Option 2: Use AppInstaller.exe (GUI prompt)
 
-Option A: Use [Run] again to delete folder
+If you want Windows’ GUI installer to appear:
+
+[Run]
+Filename: "explorer.exe";
+Parameters: """{app}\frontend\Ochoa.Package_10.msixbundle""";
+Flags: shellexec
+
+	🔄 This opens the App Installer interface, and user has to click Install manually.
+
+⚠️ Notes
+	•	.msixbundle is not directly executable, it must go through Add-AppxPackage or explorer.exe.
+	•	Make sure your Inno Setup installer is run as administrator or it will silently fail.
+	•	If you’re using Add-AppDevPackage.ps1, it ultimately wraps Add-AppxPackage, so this is effectively the same — just removing the middleman.
+
+✅ Bonus: Avoid Copying Frontend Folder
+
+If your only goal is to install Ochoa.Package_10.msixbundle, then you only need to include that file, not the whole frontend folder.
+
+[Files]
+Source: "installer_setup\frontend\Ochoa.Package_10.msixbundle"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
 [Run]
 Filename: "powershell.exe";
-Parameters: "-Command Remove-Item -Path '{app}\frontend' -Recurse -Force";
-Flags: runhidden
+Parameters: "-ExecutionPolicy Bypass -NoProfile -Command Add-AppxPackage -Path '{tmp}\Ochoa.Package_10.msixbundle'";
+Flags: runhidden waituntilterminated
 
-Put this after the Add-AppDevPackage.ps1 line to make sure it runs after FE install is done.
-
-Option B: Use [Code] section for more control
-
-You can delete the folder in PascalScript:
-
-[Code]
-procedure CurStepChanged(CurStep: TSetupStep);
-var
-  ResultCode: Integer;
-begin
-  if CurStep = ssPostInstall then begin
-    Exec('powershell.exe',
-         '-Command Remove-Item -Path "' + ExpandConstant('{app}\frontend') + '" -Recurse -Force',
-         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  end;
-end;
-
-🔐 Important Notes
-	•	Make sure Add-AppDevPackage.ps1 doesn’t need anything from that folder after install completes.
-	•	Don’t use deleteafterinstall on [Files] if you’re copying to {app} — that’s for {tmp} only.
-
-✅ Result
-	•	✅ Files copied to C:\Program Files\Ochoa\frontend
-	•	✅ Frontend installed from there
-	•	✅ Folder deleted post-install
-	•	✅ Wizard shows Finish button properly
-
-Let me know if you want to zip the frontend and unzip it instead — that saves even more space.
+Would you like me to refactor your installer to use this msixbundle method directly and skip .ps1 completely?
