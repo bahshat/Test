@@ -1,73 +1,50 @@
-Great to hear your Inno Setup installer is working! Let’s address your questions on size optimization, finish button issue, and distribution strategy.
+Thanks — you’re right to investigate why the PowerShell script isn’t running from {tmp}. If it’s not being copied to {tmp} or running properly, here are the key points and how to fix it reliably:
 
-✅ 1. Can we avoid copying the frontend folder to Program Files?
+✅ Goal:
 
-Yes — you don’t need to copy the entire frontend/ folder to Program Files if it’s only used to install the .msixbundle via Add-AppDevPackage.ps1.
+Run Add-AppDevPackage.ps1 from a temporary folder without copying the full frontend/ folder to Program Files.
 
-✅ Recommended:
-	•	Instead of copying frontend/, run the install script directly from the setup source folder.
-	•	You can mark the folder as dontcopy using a flag in the [Files] section:
+✅ Fix: Ensure Files Are Copied to {tmp} and Used
+
+✅ Step 1: Copy Only Required Files to {tmp}
+
+Update [Files] section in Inno Setup:
 
 [Files]
-Source: "installer_setup\frontend\*"; DestDir: "{tmp}\frontend"; Flags: deleteafterinstall
+Source: "installer_setup\frontend\Add-AppDevPackage.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "installer_setup\frontend\Ochoa.msixbundle"; DestDir: "{tmp}"; Flags: deleteafterinstall
 
-Or use {src} if you’re sure installer can run scripts from source:
+➡️ This ensures only the .ps1 and .msixbundle are copied temporarily.
 
-[Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{tmp}\frontend\Add-AppDevPackage.ps1"""; Flags: runhidden
-
-This way, it installs and deletes the temporary files, keeping final installed size small.
-
-✅ 2. Finish button not showing in wizard
-
-You’re right: this typically happens if:
-	•	A long-running process (like Add-AppDevPackage.ps1) runs without letting Inno Setup know it has finished.
-	•	Or the run step is not asynchronous-safe.
-
-✅ Fix:
-
-Use WaitUntilTerminated=yes to ensure the script completes before finishing UI:
+✅ Step 2: Run PowerShell Script from {tmp}
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-ExecutionPolicy Bypass -File ""{tmp}\frontend\Add-AppDevPackage.ps1"""; Flags: runhidden; WaitUntilTerminated=yes
+Filename: "powershell.exe";
+Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{tmp}\Add-AppDevPackage.ps1""";
+Flags: runhidden waituntilterminated
 
-And ensure the script doesn’t leave child processes running (like msiexec or PowerShell background tasks).
+This ensures it waits for the installation to complete before showing “Finish” and doesn’t keep the wizard stuck.
 
-✅ 3. Other Size Optimizations
+✅ Optional: Fix Add-AppDevPackage.ps1 to Expect Local Path
 
-Area	Optimization
-.msixbundle	Remove debug symbols (sign only release)
-frontend/	Don’t copy, use deleteafterinstall
-backend/	Zip it beforehand and extract via script
-Compress level	Set Compression=lzma2/ultra64
-Icons/images	Use .ico instead of .png/.bmp
+If your Add-AppDevPackage.ps1 references the MSIX file with a relative path (e.g. .\Ochoa.msixbundle), ensure it’s referencing it relative to $PSScriptRoot:
 
-In [Setup]:
+Add-AppxPackage "$PSScriptRoot\Ochoa.msixbundle"
 
-Compression=lzma2/ultra64
-SolidCompression=yes
+✅ Verify It’s in {tmp}
 
-✅ 4. Better Way to Share the Installer
+To debug if file copied or not:
+	•	Temporarily remove deleteafterinstall
+	•	Add this to [Run]:
 
-Option	Description
-🔹 Azure DevOps Artifact	Upload final .exe or .zip automatically after build
-🔹 Share via OneDrive/Google Drive	Easy, but less professional
-🔹 Self-hosted page	Simple HTML page with changelog + download
-🔹 GitHub Release	Great for public or open projects
+[Run]
+Filename: "explorer.exe"; Parameters: "{tmp}"; Flags: nowait
 
-✅ Bonus: Add Versioning + Metadata
+✅ Summary
 
-[Setup]
-AppVersion={#MyAppVersion}
-AppPublisher=Your Company
-AppPublisherURL=https://example.com
-AppSupportURL=https://example.com/support
+Fix	Description
+Copy required files to {tmp}	Using [Files] with deleteafterinstall
+Run script from {tmp}	Use correct PowerShell command
+Fix .ps1 file	Use $PSScriptRoot for file references
 
-Keep version in a separate .iss include file or pass as CLI arg.
-
-Let me know if you’d like:
-	•	RunOnce logic for backend startup
-	•	Script to zip/unzip backend cleanly during install
-	•	Cleanup mechanism to auto-remove install folders
-
-You’re doing great — just a bit more polishing now 🚀
+Let me know if you want to combine the .ps1 and .msixbundle into one .zip to unpack during setup for further optimization.
