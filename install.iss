@@ -1,50 +1,56 @@
-Thanks — you’re right to investigate why the PowerShell script isn’t running from {tmp}. If it’s not being copied to {tmp} or running properly, here are the key points and how to fix it reliably:
+👍 Got it! Here’s how you can copy the frontend folder to C:\Program Files\Ochoa, use it during install, and clean it up after installation finishes.
 
-✅ Goal:
+✅ Step-by-Step Plan
 
-Run Add-AppDevPackage.ps1 from a temporary folder without copying the full frontend/ folder to Program Files.
-
-✅ Fix: Ensure Files Are Copied to {tmp} and Used
-
-✅ Step 1: Copy Only Required Files to {tmp}
-
-Update [Files] section in Inno Setup:
+✅ 1. Copy frontend folder to {app} (Program Files\Ochoa)
 
 [Files]
-Source: "installer_setup\frontend\Add-AppDevPackage.ps1"; DestDir: "{tmp}"; Flags: deleteafterinstall
-Source: "installer_setup\frontend\Ochoa.msixbundle"; DestDir: "{tmp}"; Flags: deleteafterinstall
+Source: "installer_setup\frontend\*"; DestDir: "{app}\frontend"; Flags: recursesubdirs
 
-➡️ This ensures only the .ps1 and .msixbundle are copied temporarily.
-
-✅ Step 2: Run PowerShell Script from {tmp}
+✅ 2. Run the PowerShell install script from {app}\frontend
 
 [Run]
 Filename: "powershell.exe";
-Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{tmp}\Add-AppDevPackage.ps1""";
+Parameters: "-ExecutionPolicy Bypass -NoProfile -File ""{app}\frontend\Add-AppDevPackage.ps1""";
 Flags: runhidden waituntilterminated
 
-This ensures it waits for the installation to complete before showing “Finish” and doesn’t keep the wizard stuck.
+✅ 3. Delete frontend folder after install
 
-✅ Optional: Fix Add-AppDevPackage.ps1 to Expect Local Path
+There are two ways to do this:
 
-If your Add-AppDevPackage.ps1 references the MSIX file with a relative path (e.g. .\Ochoa.msixbundle), ensure it’s referencing it relative to $PSScriptRoot:
-
-Add-AppxPackage "$PSScriptRoot\Ochoa.msixbundle"
-
-✅ Verify It’s in {tmp}
-
-To debug if file copied or not:
-	•	Temporarily remove deleteafterinstall
-	•	Add this to [Run]:
+Option A: Use [Run] again to delete folder
 
 [Run]
-Filename: "explorer.exe"; Parameters: "{tmp}"; Flags: nowait
+Filename: "powershell.exe";
+Parameters: "-Command Remove-Item -Path '{app}\frontend' -Recurse -Force";
+Flags: runhidden
 
-✅ Summary
+Put this after the Add-AppDevPackage.ps1 line to make sure it runs after FE install is done.
 
-Fix	Description
-Copy required files to {tmp}	Using [Files] with deleteafterinstall
-Run script from {tmp}	Use correct PowerShell command
-Fix .ps1 file	Use $PSScriptRoot for file references
+Option B: Use [Code] section for more control
 
-Let me know if you want to combine the .ps1 and .msixbundle into one .zip to unpack during setup for further optimization.
+You can delete the folder in PascalScript:
+
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep = ssPostInstall then begin
+    Exec('powershell.exe',
+         '-Command Remove-Item -Path "' + ExpandConstant('{app}\frontend') + '" -Recurse -Force',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+end;
+
+🔐 Important Notes
+	•	Make sure Add-AppDevPackage.ps1 doesn’t need anything from that folder after install completes.
+	•	Don’t use deleteafterinstall on [Files] if you’re copying to {app} — that’s for {tmp} only.
+
+✅ Result
+	•	✅ Files copied to C:\Program Files\Ochoa\frontend
+	•	✅ Frontend installed from there
+	•	✅ Folder deleted post-install
+	•	✅ Wizard shows Finish button properly
+
+Let me know if you want to zip the frontend and unzip it instead — that saves even more space.
