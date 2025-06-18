@@ -1,74 +1,131 @@
-Based on your provided code snippet, I'll show you exactly where to add the full-screen functionality. Your code appears to be a UWP implementation (not WinUI 3) and has some typos, but I'll work with what you have.
+Here's how to modify your React Native Windows app to **always launch in maximized window mode** (not full-screen) and **customize the title bar**:
 
-### Modified Code with Full-Screen Support
+---
+
+### 1. Always Launch as Maximized Window (Not Full-Screen)
+Replace your previous full-screen code with this in `App.xaml.cpp`:
 
 ```cpp
-#include <winrt/Windows.UI.ViewManagement.h>  // ADD THIS HEADER AT TOP OF FILE
-
-// ...
+#include <Windows.h> // Add this at top for HWND access
 
 void App::OnLaunched(winrt::Windows::ApplicationModel::Activation::LaunchActivatedEventArgs const& e)
 {
-    __super::OnLaunched(e);  // Fixed parameter and super call
+    __super::OnLaunched(e);
+    
+    // ... your existing frame/navigation code ...
 
-    Frame rootFrame = Window::Current().Content().try_as<Frame>();  // Fixed typo
+    // ===== MAXIMIZED WINDOW =====
+    HWND hwnd;
+    Window::Current().try_as<IWindowNative>()->get_WindowHandle(&hwnd);
+    ShowWindow(hwnd, SW_MAXIMIZE); // This maximizes the window
+    
+    Window::Current().Activate();
+}
+```
+
+---
+
+### 2. Customize Title Bar
+Add this code **after** the maximize code but **before** `Window::Current().Activate()`:
+
+#### For Light Theme Title Bar:
+```cpp
+auto titleBar = winrt::Windows::UI::ViewManagement::ApplicationView::GetForCurrentView().TitleBar();
+titleBar.ButtonBackgroundColor(winrt::Windows::UI::Colors::Transparent());
+titleBar.ButtonInactiveBackgroundColor(winrt::Windows::UI::Colors::Transparent());
+titleBar.BackgroundColor(winrt::Windows::UI::Colors::Transparent());
+```
+
+#### For Dark Theme Title Bar:
+```cpp
+auto titleBar = winrt::Windows::UI::ViewManagement::ApplicationView::GetForCurrentView().TitleBar();
+titleBar.ButtonBackgroundColor(winrt::Windows::UI::Colors::Transparent());
+titleBar.ButtonForegroundColor(winrt::Windows::UI::Colors::White());
+titleBar.ButtonInactiveBackgroundColor(winrt::Windows::UI::Colors::Transparent());
+titleBar.BackgroundColor(winrt::Windows::UI::Colors::Transparent());
+```
+
+#### To Extend Content Into Title Bar (React Native Control):
+1. First add the title bar code above
+2. Then in your `App.xaml` add:
+   ```xml
+   <mc:Ignorable="d" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"/>
+   ```
+3. In your React Native JavaScript:
+   ```javascript
+   import {Platform} from 'react-native';
+   
+   if (Platform.OS === 'windows') {
+     const {TitleBar} = require('react-native-windows');
+     TitleBar.extendViewIntoTitleBar(true);
+   }
+   ```
+
+---
+
+### 3. Full Final Code Example
+```cpp
+#include <Windows.h>
+#include <winrt/Windows.UI.ViewManagement.h>
+
+void App::OnLaunched(winrt::Windows::ApplicationModel::Activation::LaunchActivatedEventArgs const& e)
+{
+    __super::OnLaunched(e);
+    
+    Frame rootFrame = Window::Current().Content().try_as<Frame>();
     if (!rootFrame) {
         rootFrame = Frame();
         Window::Current().Content(rootFrame);
     }
-
+    
     if (rootFrame.Content() == nullptr) {
-        rootFrame.Navigate(winrt::xaml_typename<MainPage>(), winrt::box_value(e.Arguments()));  // Fixed navigation call
+        rootFrame.Navigate(winrt::xaml_typename<MainPage>(), winrt::box_value(e.Arguments()));
     }
 
-    // ======== ADD FULL-SCREEN CODE HERE ========
-    auto view = winrt::Windows::UI::ViewManagement::ApplicationView::GetForCurrentView();
-    if (!view.IsFullScreenMode()) {
-        view.TryEnterFullScreenMode();
-    }
-    // ======== END FULL-SCREEN CODE ========
+    // Maximize Window
+    HWND hwnd;
+    Window::Current().try_as<IWindowNative>()->get_WindowHandle(&hwnd);
+    ShowWindow(hwnd, SW_MAXIMIZE);
 
-    Window::Current().Activate();  // Ensure this comes AFTER full-screen code
+    // Customize Title Bar
+    auto titleBar = winrt::Windows::UI::ViewManagement::ApplicationView::GetForCurrentView().TitleBar();
+    titleBar.ButtonBackgroundColor(winrt::Windows::UI::Colors::Transparent());
+    titleBar.ButtonInactiveBackgroundColor(winrt::Windows::UI::Colors::Transparent());
+    titleBar.BackgroundColor(winrt::Windows::UI::Colors::Transparent());
+
+    Window::Current().Activate();
 }
-
-// ... rest of your code ...
 ```
 
-### Key Changes Made:
+---
 
-1. **Added the required header** at the top:
+### Additional Customization Options:
+1. **Change Title Text**:
    ```cpp
-   #include <winrt/Windows.UI.ViewManagement.h>
+   ApplicationView::GetForCurrentView().Title(L"My Custom Title");
    ```
 
-2. **Fixed several issues** in your existing code:
-   - Corrected super call: `__super::OnLaunched(e)`
-   - Fixed frame access: `try_as<Frame>()`
-   - Fixed navigation call: `Navigate(winrt::xaml_typename<MainPage>(), ...)`
-
-3. **Added full-screen functionality** in the optimal location:
-   - After setting window content
-   - Before activating the window
-   - Checks if already full-screen before making changes
-
-### Important Notes:
-
-1. **Placement is Critical**: The full-screen code must come:
-   - After `Window::Current().Content(rootFrame)`
-   - Before `Window::Current().Activate()`
-
-2. **Build Requirements**: After making these changes, you'll need to:
-   ```bash
-   npx react-native run-windows
+2. **Hide Title Bar Completely**:
+   ```cpp
+   CoreApplication::GetCurrentView().TitleBar().ExtendViewIntoTitleBar(true);
    ```
-   Or rebuild the solution in Visual Studio
 
-3. **Behavior**:
-   - App will start in full-screen mode automatically
-   - Users can exit with F11 or Alt+Enter
-   - Will re-enter full-screen on next launch
-   - Only affects Windows version of your app
+3. **React Native Integration**:
+   Create a native module if you want to control these settings from JavaScript.
 
-4. **Error Handling**: The code safely checks `if (!view.IsFullScreenMode())` before attempting to enter full-screen mode.
+---
 
-If you're using WinUI 3 instead of UWP, the implementation will be different - let me know if you need that version instead. The code above is for UWP-based React Native Windows apps which is the most common configuration.
+### Why This Works Better:
+1. **Maximize vs Full-Screen**:
+   - `SW_MAXIMIZE` makes the window take all available screen space while keeping window controls
+   - More user-friendly than full-screen mode (F11 still works to toggle)
+
+2. **Persistent Across Launches**:
+   - The window size/position is now controlled by Windows' window manager
+   - Will remember maximized state between launches
+
+3. **Title Bar Customization**:
+   - Gives your app a more modern look
+   - Better integration with React Native components
+
+Remember to **rebuild your project** after making these changes (`npx react-native run-windows`). The title bar customization may require additional styling in your React components to look perfect.
